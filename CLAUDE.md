@@ -4,7 +4,7 @@ This file is the source of truth for project conventions and context. **Any chan
 
 ## Project Overview
 
-Focus Bar — a Pomodoro timer that lives in the macOS menu bar. Cycles through work sessions and breaks (configurable durations; defaults: 25-minute work, 5-minute short break, 20-minute long break after every 4 sessions). Native Swift app using AppKit's `NSStatusItem`.
+Intentime — a Pomodoro timer that lives in the macOS menu bar. Cycles through work sessions and breaks (configurable durations; defaults: 25-minute work, 5-minute short break, 20-minute long break after every 4 sessions). Native Swift app using AppKit's `NSStatusItem`.
 
 ## Development Environment
 
@@ -25,8 +25,8 @@ Focus Bar — a Pomodoro timer that lives in the macOS menu bar. Cycles through 
 
 ```
 Package.swift                  # SwiftPM manifest
-Sources/FocusBar/
-  FocusBarApp.swift            # @main entry point, AppDelegate with NSStatusItem + NSMenu
+Sources/Intentime/
+  IntentimeApp.swift           # @main entry point, AppDelegate with NSStatusItem + NSMenu
   GlobalHotKey.swift           # Carbon RegisterEventHotKey wrapper for system-wide shortcuts
   TimerModel.swift             # Pomodoro state machine managing phases, countdown + persistence
   Settings.swift               # Singleton holding user-configurable durations, persisted in UserDefaults

@@ -39,7 +39,7 @@ final class GlobalHotKey {
             1, &eventType, selfPtr, &eventHandlerRef)
 
         let hotKeyID = EventHotKeyID(
-            signature: fourCharCode("FBAR"), id: 1)
+            signature: fourCharCode("INTM"), id: 1)
         RegisterEventHotKey(
             keyCode, modifiers, hotKeyID,
             GetEventDispatcherTarget(), 0, &hotKeyRef)

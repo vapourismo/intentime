@@ -3,7 +3,7 @@ import Carbon
 
 /// Entry point. Configures the app as a menu-bar-only agent (no Dock icon) and starts the run loop.
 @main
-enum FocusBarApp {
+enum IntentimeApp {
     static func main() {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)

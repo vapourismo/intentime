@@ -3,12 +3,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "FocusBar",
+    name: "Intentime",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "FocusBar",
-            path: "Sources/FocusBar"
+            name: "Intentime",
+            path: "Sources/Intentime"
         ),
     ]
 )
