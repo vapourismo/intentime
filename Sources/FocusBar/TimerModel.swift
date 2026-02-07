@@ -5,10 +5,12 @@ final class TimerModel: ObservableObject {
     @Published var secondsLeft: Int?
     @Published var formattedTime: String?
     @Published var isRunning: Bool = false
+    @Published var isPaused: Bool = false
     @Published var message: String?
 
     private let focusDuration: TimeInterval = 25 * 60
     private let endTimeKey = "endTime"
+    private let pausedSecondsKey = "pausedSecondsLeft"
     private let messageKey = "focusMessage"
     private var timerCancellable: AnyCancellable?
 
@@ -17,7 +19,7 @@ final class TimerModel: ObservableObject {
             let m = seconds / 60
             let s = seconds % 60
             formattedTime = String(format: "%02d:%02d", m, s)
-            isRunning = true
+            isRunning = !isPaused
         } else {
             formattedTime = nil
             isRunning = false
@@ -26,6 +28,11 @@ final class TimerModel: ObservableObject {
 
     /// Whether a previous session is persisted and still has time remaining.
     var hasPreviousSession: Bool {
+        // Check for a paused session
+        if UserDefaults.standard.integer(forKey: pausedSecondsKey) > 0 {
+            return true
+        }
+        // Check for a running session
         let endTime = UserDefaults.standard.double(forKey: endTimeKey)
         guard endTime > 0 else { return false }
         return Int(endTime - Date.now.timeIntervalSince1970) > 0
@@ -47,8 +54,30 @@ final class TimerModel: ObservableObject {
         startTimer()
     }
 
+    func pause() {
+        guard let remaining = secondsLeft, remaining > 0, !isPaused else { return }
+        timerCancellable?.cancel()
+        timerCancellable = nil
+        UserDefaults.standard.removeObject(forKey: endTimeKey)
+        UserDefaults.standard.set(remaining, forKey: pausedSecondsKey)
+        isPaused = true
+        updateDerived()
+    }
+
+    func unpause() {
+        guard isPaused, let remaining = secondsLeft, remaining > 0 else { return }
+        isPaused = false
+        UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
+        let endTime = Date.now.timeIntervalSince1970 + Double(remaining)
+        UserDefaults.standard.set(endTime, forKey: endTimeKey)
+        updateDerived()
+        startTimer()
+    }
+
     func stop() {
         UserDefaults.standard.removeObject(forKey: endTimeKey)
+        UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
+        isPaused = false
         secondsLeft = nil
         timerCancellable?.cancel()
         timerCancellable = nil
@@ -67,6 +96,15 @@ final class TimerModel: ObservableObject {
     }
 
     private func restoreTimer() {
+        // Check for a paused session first
+        let pausedSeconds = UserDefaults.standard.integer(forKey: pausedSecondsKey)
+        if pausedSeconds > 0 {
+            secondsLeft = pausedSeconds
+            isPaused = true
+            updateDerived()
+            return
+        }
+
         let endTime = UserDefaults.standard.double(forKey: endTimeKey)
         guard endTime > 0 else { return }
 

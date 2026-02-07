@@ -48,12 +48,13 @@ Sources/FocusBar/
 - AppKit `NSStatusItem` + `NSMenu` for menu bar presence (SwiftUI `MenuBarExtra` label does not reliably update from `ObservableObject` state changes)
 - Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
 - Timer state lives in `TimerModel` (`ObservableObject`); the `AppDelegate` subscribes to `objectWillChange` and rebuilds the `NSStatusItem` button title and `NSMenu` on each change
-- Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick
+- Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick. Paused state is persisted as `pausedSecondsLeft` (integer) — on pause the end time is cleared and remaining seconds saved; on unpause a new end time is computed
 - 1-second timer via `Timer.publish(every: 1, on: .main, in: .common)` — fires even when menu is open
 - Timer and message are independent: the timer can be started/stopped without setting a message, and a message can be set/cleared without a running timer
 - Message is persisted in `UserDefaults` and restored on launch (independent of timer state)
 - Timer is NOT auto-restored on launch; instead, a "Continue Previous Timer" menu item appears when a previous session is still valid, letting the user choose to resume
-- Menu bar title shows `MM:SS — message` (both active), `MM:SS` (timer only), or `message` (message only); icon only when both are inactive
+- Timer can be paused and resumed; paused state survives app restart via `UserDefaults`
+- Menu bar title shows `MM:SS — message` (both active), `MM:SS` (timer only), or `message` (message only); icon only when both are inactive. When paused, the icon changes to `pause.circle`
 
 ## Gotchas
 

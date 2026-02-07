@@ -38,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hasMessage = timer.message != nil
 
         if hasTimer || hasMessage {
-            button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
+            let iconName = timer.isPaused ? "pause.circle" : "clock"
+            button.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Focus Timer")
             var parts: [String] = []
             if let time = timer.formattedTime {
                 parts.append(time)
@@ -58,6 +59,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Timer section
         if timer.isRunning {
+            let pauseItem = NSMenuItem(title: "Pause Timer", action: #selector(pauseTimer), keyEquivalent: "")
+            pauseItem.target = self
+            menu.addItem(pauseItem)
+
+            let stopItem = NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: "")
+            stopItem.target = self
+            menu.addItem(stopItem)
+        } else if timer.isPaused {
+            let resumeItem = NSMenuItem(title: "Resume Timer", action: #selector(unpauseTimer), keyEquivalent: "")
+            resumeItem.target = self
+            menu.addItem(resumeItem)
+
             let stopItem = NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: "")
             stopItem.target = self
             menu.addItem(stopItem)
@@ -103,6 +116,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func resumeTimer() {
         timer.resume()
+    }
+
+    @objc private func pauseTimer() {
+        timer.pause()
+    }
+
+    @objc private func unpauseTimer() {
+        timer.unpause()
     }
 
     @objc private func stopTimer() {
