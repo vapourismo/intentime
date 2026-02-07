@@ -326,9 +326,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             window.orderFrontRegardless()
             self.flashWindows.append(window)
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 NSAnimationContext.runAnimationGroup({ ctx in
-                    ctx.duration = 0.8
+                    ctx.duration = 2.0
                     window.animator().alphaValue = 0
                 }, completionHandler: { [weak self] in
                     window.close()
