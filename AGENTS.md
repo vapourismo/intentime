@@ -50,6 +50,7 @@ build/                         # Bundle output (gitignored)
 
 - Commits use [Conventional Commits](https://www.conventionalcommits.org/) format: `type: description`
 - Main branch: `main`
+- Agents must create/use a feature branch for every code or doc change and must not commit directly to `main` (branch name format: `feature/<short-description>`).
 
 ## Architecture Decisions
 
