@@ -147,6 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.accessoryView = input
         alert.window.initialFirstResponder = input
 
+        NSApp.activate(ignoringOtherApps: true)
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             let text = input.stringValue
