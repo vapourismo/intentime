@@ -220,7 +220,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 skipItem.target = self
                 menu.addItem(skipItem)
             } else {
-                let skipItem = NSMenuItem(title: "Skip Break", action: #selector(skipPhase), keyEquivalent: "")
+                let skipItem = NSMenuItem(title: "End Break", action: #selector(skipPhase), keyEquivalent: "")
                 skipItem.target = self
                 menu.addItem(skipItem)
             }
