@@ -4,7 +4,7 @@ This file is the source of truth for project conventions and context. **Any chan
 
 ## Project Overview
 
-Raycast menu bar extension ("Focus Bar") — a focus timer that lives in the macOS menu bar. Built with React/TypeScript on the Raycast Extension API. Currently in early development with placeholder UI and no timer logic yet.
+Raycast menu bar extension ("Focus Bar") — a 25-minute focus timer that lives in the macOS menu bar. Built with React/TypeScript on the Raycast Extension API.
 
 ## Development Environment
 
@@ -47,9 +47,14 @@ assets/
 ## Architecture Decisions
 
 - Single-file component in `src/focus-bar.tsx` using Raycast's `MenuBarExtra` for menu bar presence
+- Timer uses Raycast `Cache` to persist `endTime` (epoch ms); remaining time is computed on each render
+- Background refresh at 10s interval (minimum allowed by Raycast) keeps the menu bar title updated
+- Menu bar title shows `MM:SS` while running, hidden when idle (icon only)
 - Raycast handles the build pipeline — no custom bundler config needed
 
 ## Gotchas
 
 - Nix files must be staged in git before `nix flake update` will see them
 - Raycast types are auto-generated in `raycast-env.d.ts` — do not edit manually
+- MenuBarExtra commands are **not** long-lived processes — `setInterval`/`setState` won't update the menu bar. Use `Cache` + background refresh (`interval` in package.json) instead
+- Minimum background refresh interval is `10s`; actual timing varies (macOS optimizes for energy)

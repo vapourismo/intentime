@@ -14,7 +14,8 @@
       "name": "focus-bar",
       "title": "Focus Bar",
       "description": "Show focus timer in the menu bar",
-      "mode": "menu-bar"
+      "mode": "menu-bar",
+      "interval": "10s"
     }
   ],
   "dependencies": {
