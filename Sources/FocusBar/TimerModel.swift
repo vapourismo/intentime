@@ -21,7 +21,7 @@ final class TimerModel {
     /// Called when a break ends and the model is waiting for user confirmation to start work.
     var onBreakEnded: (() -> Void)?
 
-    static let pomodorosPerCycle = 4
+    private let settings = Settings.shared
 
     var message: String? {
         get { _message }
@@ -38,12 +38,12 @@ final class TimerModel {
         }
     }
 
-    /// Duration for the current phase.
+    /// Duration for the current phase (reads from Settings).
     var phaseDuration: TimeInterval {
         switch phase {
-        case .work: return 25 * 60
-        case .shortBreak: return 5 * 60
-        case .longBreak: return 20 * 60
+        case .work: return TimeInterval(settings.workMinutes * 60)
+        case .shortBreak: return TimeInterval(settings.shortBreakMinutes * 60)
+        case .longBreak: return TimeInterval(settings.longBreakMinutes * 60)
         }
     }
 
@@ -166,7 +166,7 @@ final class TimerModel {
         switch phase {
         case .work:
             pomodorosCompleted += 1
-            if pomodorosCompleted >= TimerModel.pomodorosPerCycle {
+            if pomodorosCompleted >= settings.sessionsBeforeLongBreak {
                 phase = .longBreak
             } else {
                 phase = .shortBreak

@@ -4,7 +4,7 @@ This file is the source of truth for project conventions and context. **Any chan
 
 ## Project Overview
 
-Focus Bar — a Pomodoro timer that lives in the macOS menu bar. Cycles through 25-minute work sessions and breaks (5-minute short breaks, 20-minute long break after every 4 pomodoros). Native Swift app using AppKit's `NSStatusItem`.
+Focus Bar — a Pomodoro timer that lives in the macOS menu bar. Cycles through work sessions and breaks (configurable durations; defaults: 25-minute work, 5-minute short break, 20-minute long break after every 4 sessions). Native Swift app using AppKit's `NSStatusItem`.
 
 ## Development Environment
 
@@ -28,6 +28,7 @@ Package.swift                  # SwiftPM manifest
 Sources/FocusBar/
   FocusBarApp.swift            # @main entry point, AppDelegate with NSStatusItem + NSMenu
   TimerModel.swift             # Pomodoro state machine managing phases, countdown + persistence
+  Settings.swift               # Singleton holding user-configurable durations, persisted in UserDefaults
 ```
 
 ## Tech Stack
@@ -48,7 +49,8 @@ Sources/FocusBar/
 - AppKit `NSStatusItem` + `NSMenu` for menu bar presence (SwiftUI `MenuBarExtra` label does not reliably update from `ObservableObject` state changes)
 - Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
 - Timer state lives in `TimerModel`; the `AppDelegate` uses a 0.5s `Timer` scheduled in `.common` RunLoop mode to poll the model and update the `NSStatusItem` button title/image — this fires even during `NSMenu` event tracking. The menu is rebuilt on demand via `NSMenuDelegate.menuNeedsUpdate(_:)`
-- Pomodoro cycle: work (25 min) → short break (5 min) → repeat; after 4 work sessions → long break (20 min) → cycle restarts. Work→break transitions happen automatically. When a break ends, the app pauses and shows a floating HUD prompt (NSPanel) with "Continue" and "Stop" buttons — the next work session only starts after user confirmation. Current phase and pomodoro count are persisted in `UserDefaults`
+- Pomodoro cycle: work → short break → repeat; after N work sessions → long break → cycle restarts. All durations and session count are configurable via `Settings` (persisted in `UserDefaults`; defaults: 25/5/20 min, 4 sessions). Work→break transitions happen automatically. When a break ends, the app pauses and shows a floating HUD prompt (NSPanel) with "Continue" and "Stop" buttons — the next work session only starts after user confirmation. Current phase and pomodoro count are persisted in `UserDefaults`
+- Settings are accessible via a "Settings…" menu item (⌘,). The settings panel is a floating HUD `NSPanel` with number fields for work duration, short break, long break (all in minutes), and sessions before long break. Changes take effect on the next phase (the currently running phase keeps its original duration)
 - Notifications use floating `NSPanel` (HUD style) banners instead of `UNUserNotificationCenter` because SwiftPM executables lack a bundle identifier. Break-start banners auto-dismiss after 4 seconds; break-end prompts persist until the user responds
 - Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick. Paused state is persisted as `pausedSecondsLeft` (integer) — on pause the end time is cleared and remaining seconds saved; on unpause a new end time is computed
 - Timer and message are independent: the timer can be started/stopped without setting a message, and a message can be set/cleared without a running timer

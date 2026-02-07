@@ -170,7 +170,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             continueItem.target = self
             menu.addItem(continueItem)
 
-            let extendItem = NSMenuItem(title: "Extend Break (+5 min)", action: #selector(extendBreakFromPrompt), keyEquivalent: "")
+            let extendItem = NSMenuItem(title: "Extend Break (+\(Settings.shared.shortBreakMinutes) min)", action: #selector(extendBreakFromPrompt), keyEquivalent: "")
             extendItem.target = self
             menu.addItem(extendItem)
 
@@ -231,6 +231,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             setItem.target = self
             menu.addItem(setItem)
         }
+
+        menu.addItem(.separator())
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
@@ -297,10 +302,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func showPhaseBanner(for phase: TimerModel.Phase) {
         guard phase == .shortBreak || phase == .longBreak else { return }
+        let settings = Settings.shared
         let title = phase == .longBreak ? "Long Break" : "Short Break"
+        let minutes = phase == .longBreak ? settings.longBreakMinutes : settings.shortBreakMinutes
         let body = phase == .longBreak
-            ? "Great work! Take a 20-minute break."
-            : "Take a 5-minute break."
+            ? "Great work! Take a \(minutes)-minute break."
+            : "Take a \(minutes)-minute break."
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 64),
@@ -383,7 +390,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let continueButton = NSButton(title: "Continue", target: self, action: #selector(continueFromPrompt))
         continueButton.bezelStyle = .rounded
         continueButton.keyEquivalent = "\r"
-        let extendButton = NSButton(title: "+5 min", target: self, action: #selector(extendBreakFromPrompt))
+        let extendButton = NSButton(title: "+\(Settings.shared.shortBreakMinutes) min", target: self, action: #selector(extendBreakFromPrompt))
         extendButton.bezelStyle = .rounded
         let stopButton = NSButton(title: "Stop", target: self, action: #selector(stopFromPrompt))
         stopButton.bezelStyle = .rounded
@@ -439,7 +446,146 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         updateButton()
     }
 
+    private var settingsPanel: NSPanel?
+
+    @objc private func openSettings() {
+        if let existing = settingsPanel, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let settings = Settings.shared
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.titled, .closable, .hudWindow, .nonactivatingPanel],
+            backing: .buffered, defer: false)
+        panel.title = "Settings"
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.isReleasedWhenClosed = false
+
+        let grid = NSGridView()
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        grid.rowSpacing = 10
+        grid.columnSpacing = 10
+
+        func makeStepperRow(value: Int, min: Int, max: Int) -> (view: NSView, stepper: NSStepper) {
+            let field = NSTextField(frame: .zero)
+            field.integerValue = value
+            field.alignment = .right
+            field.widthAnchor.constraint(equalToConstant: 50).isActive = true
+            let formatter = NumberFormatter()
+            formatter.minimum = NSNumber(value: min)
+            formatter.maximum = NSNumber(value: max)
+            formatter.allowsFloats = false
+            field.formatter = formatter
+
+            let stepper = NSStepper()
+            stepper.minValue = Double(min)
+            stepper.maxValue = Double(max)
+            stepper.increment = 1
+            stepper.valueWraps = false
+            stepper.integerValue = value
+
+            field.bind(.value, to: stepper, withKeyPath: "integerValue", options: nil)
+            stepper.bind(.value, to: field, withKeyPath: "integerValue", options: nil)
+
+            let stack = NSStackView(views: [field, stepper])
+            stack.orientation = .horizontal
+            stack.spacing = 4
+            return (stack, stepper)
+        }
+
+        let workRow = makeStepperRow(value: settings.workMinutes, min: 1, max: 120)
+        let shortBreakRow = makeStepperRow(value: settings.shortBreakMinutes, min: 1, max: 60)
+        let longBreakRow = makeStepperRow(value: settings.longBreakMinutes, min: 1, max: 120)
+        let sessionsRow = makeStepperRow(value: settings.sessionsBeforeLongBreak, min: 1, max: 20)
+
+        func label(_ text: String) -> NSTextField {
+            let l = NSTextField(labelWithString: text)
+            l.alignment = .right
+            return l
+        }
+
+        grid.addRow(with: [label("Work duration (min):"), workRow.view])
+        grid.addRow(with: [label("Short break (min):"), shortBreakRow.view])
+        grid.addRow(with: [label("Long break (min):"), longBreakRow.view])
+        grid.addRow(with: [label("Sessions before long break:"), sessionsRow.view])
+
+        let saveButton = NSButton(title: "Save", target: nil, action: nil)
+        saveButton.bezelStyle = .rounded
+        saveButton.keyEquivalent = "\r"
+
+        let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        saveButton.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(grid)
+        contentView.addSubview(saveButton)
+
+        panel.contentView = contentView
+
+        NSLayoutConstraint.activate([
+            grid.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            grid.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            saveButton.topAnchor.constraint(equalTo: grid.bottomAnchor, constant: 16),
+            saveButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            saveButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16),
+        ])
+
+        saveButton.target = self
+        saveButton.action = #selector(saveSettings(_:))
+
+        // Store steppers so we can read them on save.
+        panel.contentView?.setAssociatedFields(
+            work: workRow.stepper, shortBreak: shortBreakRow.stepper,
+            longBreak: longBreakRow.stepper, sessions: sessionsRow.stepper)
+
+        panel.center()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        settingsPanel = panel
+    }
+
+    @objc private func saveSettings(_ sender: Any?) {
+        guard let contentView = settingsPanel?.contentView,
+              let fields = contentView.associatedFields() else { return }
+        let settings = Settings.shared
+        settings.workMinutes = fields.work.integerValue
+        settings.shortBreakMinutes = fields.shortBreak.integerValue
+        settings.longBreakMinutes = fields.longBreak.integerValue
+        settings.sessionsBeforeLongBreak = fields.sessions.integerValue
+        settingsPanel?.close()
+        settingsPanel = nil
+    }
+
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+}
+
+// MARK: - Associated fields helper
+
+private struct SettingsFields {
+    let work: NSStepper
+    let shortBreak: NSStepper
+    let longBreak: NSStepper
+    let sessions: NSStepper
+}
+
+private var settingsFieldsKey: UInt8 = 0
+
+private extension NSView {
+    func setAssociatedFields(work: NSStepper, shortBreak: NSStepper,
+                             longBreak: NSStepper, sessions: NSStepper) {
+        let fields = SettingsFields(work: work, shortBreak: shortBreak,
+                                    longBreak: longBreak, sessions: sessions)
+        objc_setAssociatedObject(self, &settingsFieldsKey, fields, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+
+    func associatedFields() -> SettingsFields? {
+        objc_getAssociatedObject(self, &settingsFieldsKey) as? SettingsFields
     }
 }
