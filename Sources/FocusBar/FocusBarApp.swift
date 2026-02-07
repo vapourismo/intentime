@@ -16,6 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let timer = TimerModel()
     private var displayTimer: Timer?
 
+    func applicationWillTerminate(_ notification: Notification) {
+        // Ensure timer state is flushed to disk before exit.
+        UserDefaults.standard.synchronize()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 

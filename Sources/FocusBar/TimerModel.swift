@@ -50,6 +50,8 @@ final class TimerModel: ObservableObject {
     func start() {
         let endTime = Date.now.timeIntervalSince1970 + focusDuration
         UserDefaults.standard.set(endTime, forKey: endTimeKey)
+        UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
+        flushDefaults()
         tick()
         startTimer()
     }
@@ -60,6 +62,7 @@ final class TimerModel: ObservableObject {
         timerCancellable = nil
         UserDefaults.standard.removeObject(forKey: endTimeKey)
         UserDefaults.standard.set(remaining, forKey: pausedSecondsKey)
+        flushDefaults()
         isPaused = true
         updateDerived()
     }
@@ -70,6 +73,7 @@ final class TimerModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
         let endTime = Date.now.timeIntervalSince1970 + Double(remaining)
         UserDefaults.standard.set(endTime, forKey: endTimeKey)
+        flushDefaults()
         updateDerived()
         startTimer()
     }
@@ -77,6 +81,7 @@ final class TimerModel: ObservableObject {
     func stop() {
         UserDefaults.standard.removeObject(forKey: endTimeKey)
         UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
+        flushDefaults()
         isPaused = false
         secondsLeft = nil
         timerCancellable?.cancel()
@@ -93,6 +98,11 @@ final class TimerModel: ObservableObject {
             message = nil
             UserDefaults.standard.removeObject(forKey: messageKey)
         }
+        flushDefaults()
+    }
+
+    private func flushDefaults() {
+        CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
     }
 
     private func restoreTimer() {
