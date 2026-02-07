@@ -50,7 +50,8 @@ Sources/FocusBar/
 - Timer state lives in `TimerModel` (`ObservableObject`); the `AppDelegate` subscribes to `objectWillChange` and rebuilds the `NSStatusItem` button title and `NSMenu` on each change
 - Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick
 - 1-second timer via `Timer.publish(every: 1, on: .main, in: .common)` — fires even when menu is open
-- Starting a session shows an `NSAlert` with a text field prompting for a focus message; the message is persisted in `UserDefaults` and restored on relaunch
+- Starting a session shows an `NSAlert` with a text field prompting for a focus message; the message is persisted in `UserDefaults`
+- Timer is NOT auto-restored on launch; instead, a "Continue Previous Session" menu item appears when a previous session is still valid, letting the user choose to resume
 - Menu bar title shows `MM:SS — message` while running (or just `MM:SS` if no message), icon only when idle
 
 ## Gotchas

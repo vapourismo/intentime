@@ -57,6 +57,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let startItem = NSMenuItem(title: "Start Focus Session", action: #selector(startTimer), keyEquivalent: "")
             startItem.target = self
             menu.addItem(startItem)
+
+            if timer.hasPreviousSession {
+                let title: String
+                if let msg = timer.previousSessionMessage {
+                    title = "Continue: \(msg)"
+                } else {
+                    title = "Continue Previous Session"
+                }
+                let continueItem = NSMenuItem(title: title, action: #selector(resumeTimer), keyEquivalent: "")
+                continueItem.target = self
+                menu.addItem(continueItem)
+            }
         }
         menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
@@ -81,6 +93,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if response == .alertFirstButtonReturn {
             timer.start(message: input.stringValue)
         }
+    }
+
+    @objc private func resumeTimer() {
+        timer.resume()
     }
 
     @objc private func stopTimer() {

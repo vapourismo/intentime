@@ -24,7 +24,22 @@ final class TimerModel: ObservableObject {
         }
     }
 
-    init() {
+    /// Whether a previous session is persisted and still has time remaining.
+    var hasPreviousSession: Bool {
+        let endTime = UserDefaults.standard.double(forKey: endTimeKey)
+        guard endTime > 0 else { return false }
+        return Int(endTime - Date.now.timeIntervalSince1970) > 0
+    }
+
+    /// The focus message of a persisted previous session, if any.
+    var previousSessionMessage: String? {
+        guard hasPreviousSession else { return nil }
+        return UserDefaults.standard.string(forKey: messageKey)
+    }
+
+    init() {}
+
+    func resume() {
         restoreIfNeeded()
     }
 
