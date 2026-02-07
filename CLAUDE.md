@@ -4,7 +4,7 @@ This file is the source of truth for project conventions and context. **Any chan
 
 ## Project Overview
 
-Focus Bar — a 25-minute focus timer that lives in the macOS menu bar. Native Swift app using SwiftUI's `MenuBarExtra`.
+Focus Bar — a 25-minute focus timer that lives in the macOS menu bar. Native Swift app using AppKit's `NSStatusItem`.
 
 ## Development Environment
 
@@ -26,14 +26,14 @@ Focus Bar — a 25-minute focus timer that lives in the macOS menu bar. Native S
 ```
 Package.swift                  # SwiftPM manifest
 Sources/FocusBar/
-  FocusBarApp.swift            # @main App struct with MenuBarExtra scene
+  FocusBarApp.swift            # @main entry point, AppDelegate with NSStatusItem + NSMenu
   TimerModel.swift             # ObservableObject managing countdown + persistence
 ```
 
 ## Tech Stack
 
 - **Language:** Swift 5.9+
-- **UI:** SwiftUI `MenuBarExtra` (macOS 14+)
+- **UI:** AppKit `NSStatusItem` + `NSMenu`
 - **Persistence:** `UserDefaults`
 - **Build:** Swift Package Manager (executable target)
 
@@ -45,18 +45,18 @@ Sources/FocusBar/
 ## Architecture Decisions
 
 - SwiftPM executable target (no Xcode project needed)
-- SwiftUI `MenuBarExtra` for menu bar presence — deployment target macOS 14
+- AppKit `NSStatusItem` + `NSMenu` for menu bar presence (SwiftUI `MenuBarExtra` label does not reliably update from `ObservableObject` state changes)
 - Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
+- Timer state lives in `TimerModel` (`ObservableObject`); the `AppDelegate` subscribes to `objectWillChange` and rebuilds the `NSStatusItem` button title and `NSMenu` on each change
 - Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick
 - 1-second timer via `Timer.publish(every: 1, on: .main, in: .common)` — fires even when menu is open
-- Menu bar title shows `MM:SS` while running, hidden when idle (icon only)
-- `ObservableObject` pattern for timer state (macOS 14 compatible)
+- Menu bar title shows `MM:SS` while running, icon only when idle
 
 ## Gotchas
 
 - Nix files must be staged in git before `nix flake update` will see them
 - The flake uses `mkShellNoCC` and unsets `SDKROOT`/`DEVELOPER_DIR`/`NIX_CFLAGS_COMPILE`/`NIX_LDFLAGS` in `shellHook` — Nix's default darwin SDK is incompatible with the Xcode Swift toolchain
-- `MenuBarExtra` requires macOS 13+; we target macOS 14 for stable behavior
+- SwiftUI `MenuBarExtra` does not reliably re-render its label from `@StateObject`/`@ObservedObject` changes — this is why we use AppKit `NSStatusItem` instead
 - `Timer.publish` must use `.common` RunLoop mode, otherwise the timer pauses when the menu dropdown is open
 - The app is a menu-bar-only app (no main window); `NSApplication.setActivationPolicy(.accessory)` hides the Dock icon
 - A "Quit" menu item is essential since there's no Dock icon to right-click for quitting
