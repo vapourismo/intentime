@@ -96,10 +96,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         } else if hasTimer || hasMessage {
             if timer.isPaused {
                 button.image = NSImage(systemSymbolName: "pause.fill", accessibilityDescription: "Pomodoro Timer")
-            } else if timer.phase == .work, let seconds = timer.secondsLeft {
+            } else if timer.isRunning, timer.phase == .work, let seconds = timer.secondsLeft {
                 let progress = 1.0 - Double(seconds) / timer.phaseDuration
                 button.image = progressCircleImage(progress: progress)
-            } else if timer.phase == .shortBreak || timer.phase == .longBreak {
+            } else if timer.isRunning, (timer.phase == .shortBreak || timer.phase == .longBreak) {
                 button.image = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: "Break")
             } else {
                 button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Pomodoro Timer")
