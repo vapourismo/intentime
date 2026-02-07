@@ -13,6 +13,7 @@ final class Settings {
         static let longBreakMinutes = "settings.longBreakMinutes"
         static let sessionsBeforeLongBreak = "settings.sessionsBeforeLongBreak"
         static let extendBreakMinutes = "settings.extendBreakMinutes"
+        static let blurScreenDuringBreaks = "settings.blurScreenDuringBreaks"
     }
 
     /// Fallback values used when no persisted value exists (or the stored value is ≤ 0).
@@ -52,6 +53,12 @@ final class Settings {
     var extendBreakMinutes: Int {
         get { stored(DefaultsKey.extendBreakMinutes, default: Default.extendBreakMinutes) }
         set { UserDefaults.standard.set(newValue, forKey: DefaultsKey.extendBreakMinutes) }
+    }
+
+    /// Whether to show a full-screen blur overlay on all displays during breaks. Default: false.
+    var blurScreenDuringBreaks: Bool {
+        get { UserDefaults.standard.bool(forKey: DefaultsKey.blurScreenDuringBreaks) }
+        set { UserDefaults.standard.set(newValue, forKey: DefaultsKey.blurScreenDuringBreaks) }
     }
 
     /// Reads an integer from `UserDefaults`, falling back to `fallback` when the

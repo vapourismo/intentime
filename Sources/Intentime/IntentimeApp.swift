@@ -280,6 +280,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     /// Start a fresh Pomodoro cycle.
     @objc private func startTimer() {
+        dismissBlurOverlay()
         timer.start()
         updateButton()
     }
@@ -304,12 +305,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     /// Stop the timer and reset to idle.
     @objc private func stopTimer() {
+        dismissBlurOverlay()
         timer.stop()
         updateButton()
     }
 
     /// Skip the current phase (work → break or break → work).
     @objc private func skipPhase() {
+        dismissBlurOverlay()
         timer.skip()
         updateButton()
     }
@@ -453,12 +456,83 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
     }
 
+    /// Show a full-screen blur overlay on all displays during breaks.
+    ///
+    /// Uses `NSVisualEffectView` with `.behindWindow` blending for a live, hardware-accelerated
+    /// blur that requires no special permissions. The overlay passes through all mouse events.
+    private func showBlurOverlay() {
+        guard Settings.shared.blurScreenDuringBreaks else { return }
+        dismissBlurOverlay(animated: false)
+
+        for screen in NSScreen.screens {
+            let frame = screen.frame
+            let window = NSWindow(
+                contentRect: frame,
+                styleMask: [.borderless],
+                backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.level = .floating
+            window.ignoresMouseEvents = true
+            window.collectionBehavior = [.canJoinAllSpaces, .stationary]
+
+            let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: frame.size))
+            effectView.material = .fullScreenUI
+            effectView.blendingMode = .behindWindow
+            effectView.state = .active
+
+            // Add a subtle dark tint for extra dimming.
+            let tintView = NSView(frame: effectView.bounds)
+            tintView.autoresizingMask = [.width, .height]
+            tintView.wantsLayer = true
+            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.3).cgColor
+            effectView.addSubview(tintView)
+
+            window.contentView = effectView
+            window.setFrame(frame, display: true)
+            window.alphaValue = 0
+            window.orderFrontRegardless()
+            blurWindows.append(window)
+
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.5
+                window.animator().alphaValue = 1
+            }
+        }
+    }
+
+    /// Dismiss all blur overlay windows.
+    ///
+    /// - Parameter animated: Whether to fade out (0.3 s) or close immediately.
+    private func dismissBlurOverlay(animated: Bool = true) {
+        let windows = blurWindows
+        blurWindows.removeAll()
+        guard !windows.isEmpty else { return }
+
+        if animated {
+            for window in windows {
+                NSAnimationContext.runAnimationGroup({ ctx in
+                    ctx.duration = 0.3
+                    window.animator().alphaValue = 0
+                }, completionHandler: {
+                    window.close()
+                })
+            }
+        } else {
+            for window in windows {
+                window.close()
+            }
+        }
+    }
+
     /// Show a temporary HUD banner in the top-right corner announcing a break phase.
     ///
     /// Auto-dismisses after 4 seconds. Only shown for break phases (not work).
     private func showPhaseBanner(for phase: TimerModel.Phase) {
         guard phase == .shortBreak || phase == .longBreak else { return }
         flashScreenBorder()
+        showBlurOverlay()
         let settings = Settings.shared
         let title = phase == .longBreak ? "Long Break" : "Short Break"
         let minutes = phase == .longBreak ? settings.longBreakMinutes : settings.shortBreakMinutes
@@ -471,7 +545,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel, .hudWindow],
             backing: .buffered, defer: false)
         panel.isFloatingPanel = true
-        panel.level = .floating
+        panel.level = !blurWindows.isEmpty
+            ? NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+            : .floating
         panel.titlebarAppearsTransparent = true
         panel.isMovableByWindowBackground = true
         panel.titleVisibility = .hidden
@@ -530,7 +606,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel, .hudWindow],
             backing: .buffered, defer: false)
         panel.isFloatingPanel = true
-        panel.level = .floating
+        panel.level = !blurWindows.isEmpty
+            ? NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+            : .floating
         panel.titlebarAppearsTransparent = true
         panel.isMovableByWindowBackground = true
         panel.titleVisibility = .hidden
@@ -592,6 +670,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// User chose "Continue" — start the next work session.
     @objc private func continueFromPrompt() {
         dismissPromptPanel()
+        dismissBlurOverlay()
         timer.startNextWork()
         updateButton()
     }
@@ -606,12 +685,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// User chose "Stop" — end the Pomodoro session entirely.
     @objc private func stopFromPrompt() {
         dismissPromptPanel()
+        dismissBlurOverlay()
         timer.stop()
         updateButton()
     }
 
     /// Windows used for the screen-border flash animation (one per display).
     private var flashWindows: [NSWindow] = []
+    /// Full-screen blur overlay windows shown during breaks (one per display).
+    private var blurWindows: [NSWindow] = []
     /// The currently open settings panel, if any.
     private var settingsPanel: NSPanel?
 
@@ -628,7 +710,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let settings = Settings.shared
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 200),
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 200),
             styleMask: [.titled, .closable, .hudWindow, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.title = "Settings"
@@ -686,6 +768,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         grid.addRow(with: [label("Sessions before long break:"), sessionsRow.view])
         grid.addRow(with: [label("Extend break (min):"), extendBreakRow.view])
 
+        let blurCheckbox = NSButton(checkboxWithTitle: "Blur screen during breaks", target: nil, action: nil)
+        blurCheckbox.state = settings.blurScreenDuringBreaks ? .on : .off
+        grid.addRow(with: [NSView(), blurCheckbox])
+
         let saveButton = NSButton(title: "Save", target: nil, action: nil)
         saveButton.bezelStyle = .rounded
         saveButton.keyEquivalent = "\r"
@@ -710,11 +796,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         saveButton.target = self
         saveButton.action = #selector(saveSettings(_:))
 
-        // Store steppers so we can read them on save.
+        // Store steppers/controls so we can read them on save.
         panel.contentView?.setAssociatedFields(
             work: workRow.stepper, shortBreak: shortBreakRow.stepper,
             longBreak: longBreakRow.stepper, sessions: sessionsRow.stepper,
-            extendBreak: extendBreakRow.stepper)
+            extendBreak: extendBreakRow.stepper,
+            blurDuringBreaks: blurCheckbox)
 
         panel.center()
         panel.makeKeyAndOrderFront(nil)
@@ -732,6 +819,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         settings.longBreakMinutes = fields.longBreak.integerValue
         settings.sessionsBeforeLongBreak = fields.sessions.integerValue
         settings.extendBreakMinutes = fields.extendBreak.integerValue
+        settings.blurScreenDuringBreaks = fields.blurDuringBreaks.state == .on
         settingsPanel?.close()
         settingsPanel = nil
     }
@@ -762,6 +850,7 @@ private struct SettingsFields {
     let longBreak: NSStepper
     let sessions: NSStepper
     let extendBreak: NSStepper
+    let blurDuringBreaks: NSButton
 }
 
 // MARK: - Border flash view
@@ -810,10 +899,12 @@ private var settingsFieldsKey: UInt8 = 0
 private extension NSView {
     func setAssociatedFields(work: NSStepper, shortBreak: NSStepper,
                              longBreak: NSStepper, sessions: NSStepper,
-                             extendBreak: NSStepper) {
+                             extendBreak: NSStepper,
+                             blurDuringBreaks: NSButton) {
         let fields = SettingsFields(work: work, shortBreak: shortBreak,
                                     longBreak: longBreak, sessions: sessions,
-                                    extendBreak: extendBreak)
+                                    extendBreak: extendBreak,
+                                    blurDuringBreaks: blurDuringBreaks)
         objc_setAssociatedObject(self, &settingsFieldsKey, fields, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 
