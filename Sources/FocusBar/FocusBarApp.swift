@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if hasTimer || hasMessage {
             if timer.isPaused {
-                button.image = NSImage(systemSymbolName: "pause.circle", accessibilityDescription: "Focus Timer")
+                button.image = NSImage(systemSymbolName: "pause.fill", accessibilityDescription: "Focus Timer")
             } else if let seconds = timer.secondsLeft {
                 let progress = 1.0 - Double(seconds) / timer.focusDuration
                 button.image = progressCircleImage(progress: progress)
