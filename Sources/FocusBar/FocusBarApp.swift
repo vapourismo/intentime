@@ -11,7 +11,7 @@ enum FocusBarApp {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let timer = TimerModel()
     private var displayTimer: Timer?
@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else {
                 button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
             }
-            var parts: [(String, NSFont)] = []
+            var parts: [(text: String, font: NSFont)] = []
             let monoDigitFont = NSFont.monospacedDigitSystemFont(
                 ofSize: NSFont.systemFontSize, weight: .regular)
             let regularFont = NSFont.menuBarFont(ofSize: 0)
@@ -70,8 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     attributed.append(NSAttributedString(string: " — "))
                 }
                 attributed.append(NSAttributedString(
-                    string: part.0,
-                    attributes: [.font: part.1]))
+                    string: part.text,
+                    attributes: [.font: part.font]))
             }
             button.attributedTitle = attributed
             button.imagePosition = .imageLeading
@@ -207,15 +207,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             let text = input.stringValue
-            timer.setMessage(text.isEmpty ? nil : text)
+            timer.message = text.isEmpty ? nil : text
         }
     }
 
     @objc private func clearMessage() {
-        timer.setMessage(nil)
+        timer.message = nil
     }
 
     @objc private func quit() {
-        NSApplication.shared.terminate(nil)
+        NSApp.terminate(nil)
     }
 }

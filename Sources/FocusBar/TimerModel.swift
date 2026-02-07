@@ -1,18 +1,98 @@
-import Combine
 import Foundation
 
-final class TimerModel: ObservableObject {
-    @Published var secondsLeft: Int?
-    @Published var formattedTime: String?
-    @Published var isRunning: Bool = false
-    @Published var isPaused: Bool = false
-    @Published var message: String?
+final class TimerModel {
+    private(set) var secondsLeft: Int?
+    private(set) var formattedTime: String?
+    private(set) var isRunning = false
+    private(set) var isPaused = false
+
+    var message: String? {
+        get { _message }
+        set {
+            let trimmed = newValue?.trimmingCharacters(in: .whitespaces)
+            if let trimmed, !trimmed.isEmpty {
+                _message = trimmed
+                UserDefaults.standard.set(trimmed, forKey: DefaultsKey.message)
+            } else {
+                _message = nil
+                UserDefaults.standard.removeObject(forKey: DefaultsKey.message)
+            }
+            flushDefaults()
+        }
+    }
 
     let focusDuration: TimeInterval = 25 * 60
-    private let endTimeKey = "endTime"
-    private let pausedSecondsKey = "pausedSecondsLeft"
-    private let messageKey = "focusMessage"
-    private var timerCancellable: AnyCancellable?
+
+    private var _message: String?
+    private var timer: Timer?
+
+    private enum DefaultsKey {
+        static let endTime = "endTime"
+        static let pausedSecondsLeft = "pausedSecondsLeft"
+        static let message = "focusMessage"
+    }
+
+    init() {
+        _message = UserDefaults.standard.string(forKey: DefaultsKey.message)
+    }
+
+    /// Whether a previous session is persisted and still has time remaining.
+    var hasPreviousSession: Bool {
+        if UserDefaults.standard.integer(forKey: DefaultsKey.pausedSecondsLeft) > 0 {
+            return true
+        }
+        let endTime = UserDefaults.standard.double(forKey: DefaultsKey.endTime)
+        guard endTime > 0 else { return false }
+        return Int(endTime - Date.now.timeIntervalSince1970) > 0
+    }
+
+    func resume() {
+        restoreTimer()
+    }
+
+    func start() {
+        let endTime = Date.now.timeIntervalSince1970 + focusDuration
+        UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        flushDefaults()
+        tick()
+        startTimer()
+    }
+
+    func pause() {
+        guard let remaining = secondsLeft, remaining > 0, !isPaused else { return }
+        timer?.invalidate()
+        timer = nil
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.endTime)
+        UserDefaults.standard.set(remaining, forKey: DefaultsKey.pausedSecondsLeft)
+        flushDefaults()
+        isPaused = true
+        updateDerived()
+    }
+
+    func unpause() {
+        guard isPaused, let remaining = secondsLeft, remaining > 0 else { return }
+        isPaused = false
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        let endTime = Date.now.timeIntervalSince1970 + Double(remaining)
+        UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
+        flushDefaults()
+        updateDerived()
+        startTimer()
+    }
+
+    func stop() {
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.endTime)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        flushDefaults()
+        isPaused = false
+        secondsLeft = nil
+        timer?.invalidate()
+        timer = nil
+        updateDerived()
+    }
+
+    // MARK: - Private
 
     private func updateDerived() {
         if let seconds = secondsLeft, seconds > 0 {
@@ -26,88 +106,12 @@ final class TimerModel: ObservableObject {
         }
     }
 
-    /// Whether a previous session is persisted and still has time remaining.
-    var hasPreviousSession: Bool {
-        // Check for a paused session
-        if UserDefaults.standard.integer(forKey: pausedSecondsKey) > 0 {
-            return true
-        }
-        // Check for a running session
-        let endTime = UserDefaults.standard.double(forKey: endTimeKey)
-        guard endTime > 0 else { return false }
-        return Int(endTime - Date.now.timeIntervalSince1970) > 0
-    }
-
-    init() {
-        // Restore persisted message (independent of timer)
-        message = UserDefaults.standard.string(forKey: messageKey)
-    }
-
-    func resume() {
-        restoreTimer()
-    }
-
-    func start() {
-        let endTime = Date.now.timeIntervalSince1970 + focusDuration
-        UserDefaults.standard.set(endTime, forKey: endTimeKey)
-        UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
-        flushDefaults()
-        tick()
-        startTimer()
-    }
-
-    func pause() {
-        guard let remaining = secondsLeft, remaining > 0, !isPaused else { return }
-        timerCancellable?.cancel()
-        timerCancellable = nil
-        UserDefaults.standard.removeObject(forKey: endTimeKey)
-        UserDefaults.standard.set(remaining, forKey: pausedSecondsKey)
-        flushDefaults()
-        isPaused = true
-        updateDerived()
-    }
-
-    func unpause() {
-        guard isPaused, let remaining = secondsLeft, remaining > 0 else { return }
-        isPaused = false
-        UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
-        let endTime = Date.now.timeIntervalSince1970 + Double(remaining)
-        UserDefaults.standard.set(endTime, forKey: endTimeKey)
-        flushDefaults()
-        updateDerived()
-        startTimer()
-    }
-
-    func stop() {
-        UserDefaults.standard.removeObject(forKey: endTimeKey)
-        UserDefaults.standard.removeObject(forKey: pausedSecondsKey)
-        flushDefaults()
-        isPaused = false
-        secondsLeft = nil
-        timerCancellable?.cancel()
-        timerCancellable = nil
-        updateDerived()
-    }
-
-    func setMessage(_ text: String?) {
-        let trimmed = text?.trimmingCharacters(in: .whitespaces)
-        if let trimmed, !trimmed.isEmpty {
-            message = trimmed
-            UserDefaults.standard.set(trimmed, forKey: messageKey)
-        } else {
-            message = nil
-            UserDefaults.standard.removeObject(forKey: messageKey)
-        }
-        flushDefaults()
-    }
-
     private func flushDefaults() {
         CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
     }
 
     private func restoreTimer() {
-        // Check for a paused session first
-        let pausedSeconds = UserDefaults.standard.integer(forKey: pausedSecondsKey)
+        let pausedSeconds = UserDefaults.standard.integer(forKey: DefaultsKey.pausedSecondsLeft)
         if pausedSeconds > 0 {
             secondsLeft = pausedSeconds
             isPaused = true
@@ -115,7 +119,7 @@ final class TimerModel: ObservableObject {
             return
         }
 
-        let endTime = UserDefaults.standard.double(forKey: endTimeKey)
+        let endTime = UserDefaults.standard.double(forKey: DefaultsKey.endTime)
         guard endTime > 0 else { return }
 
         let remaining = Int(endTime - Date.now.timeIntervalSince1970)
@@ -124,19 +128,20 @@ final class TimerModel: ObservableObject {
             updateDerived()
             startTimer()
         } else {
-            UserDefaults.standard.removeObject(forKey: endTimeKey)
+            UserDefaults.standard.removeObject(forKey: DefaultsKey.endTime)
         }
     }
 
     private func startTimer() {
-        timerCancellable?.cancel()
-        timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in self?.tick() }
+        timer?.invalidate()
+        timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
+        RunLoop.main.add(timer!, forMode: .common)
     }
 
     private func tick() {
-        let endTime = UserDefaults.standard.double(forKey: endTimeKey)
+        let endTime = UserDefaults.standard.double(forKey: DefaultsKey.endTime)
         guard endTime > 0 else {
             stop()
             return
