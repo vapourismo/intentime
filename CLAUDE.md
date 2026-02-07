@@ -54,7 +54,7 @@ Sources/FocusBar/
 - Message is persisted in `UserDefaults` and restored on launch (independent of timer state)
 - Timer is NOT auto-restored on launch; instead, a "Continue Previous Timer" menu item appears when a previous session is still valid, letting the user choose to resume
 - Timer can be paused and resumed; paused state survives app restart via `UserDefaults`
-- Menu bar title shows `MM:SS — message` (both active), `MM:SS` (timer only), or `message` (message only); icon only when both are inactive. When the timer is active, the icon is a custom-drawn progress circle (pie chart filling clockwise from 12 o'clock) rendered via Core Graphics as a template image. When paused, the icon changes to `pause.circle`
+- Menu bar title shows `MM:SS — message` (both active), `MM:SS` (timer only), or `message` (message only); icon only when both are inactive. When the timer is active, the icon is a custom-drawn progress circle (pie chart filling clockwise from 12 o'clock) rendered via Core Graphics as a template image. When paused, the icon changes to `pause.fill`
 
 ## Gotchas
 
