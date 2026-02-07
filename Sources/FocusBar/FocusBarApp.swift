@@ -302,7 +302,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func flashScreenBorder() {
         let glowWidth: CGFloat = 40
-        let color = NSColor.systemGreen
+        let color = NSColor.systemOrange
 
         for screen in NSScreen.screens {
             let frame = screen.frame
