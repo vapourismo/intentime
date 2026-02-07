@@ -717,29 +717,48 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let settings = Settings.shared
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 200),
-            styleMask: [.titled, .closable, .hudWindow, .nonactivatingPanel],
+            contentRect: NSRect(x: 0, y: 0, width: 470, height: 410),
+            styleMask: [.titled, .closable, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.title = "Settings"
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.isReleasedWhenClosed = false
-
-        let grid = NSGridView()
-        grid.translatesAutoresizingMaskIntoConstraints = false
-        grid.rowSpacing = 10
-        grid.columnSpacing = 10
+        panel.titleVisibility = .visible
+        panel.titlebarAppearsTransparent = false
 
         func makeStepperRow(value: Int, min: Int, max: Int) -> (view: NSView, stepper: NSStepper) {
             let field = NSTextField(frame: .zero)
             field.integerValue = value
-            field.alignment = .right
-            field.widthAnchor.constraint(equalToConstant: 50).isActive = true
+            field.alignment = .center
+            field.font = NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .semibold)
+            field.isEditable = true
+            field.isSelectable = true
+            field.isBezeled = false
+            field.isBordered = false
+            field.drawsBackground = false
+            field.focusRingType = .none
+            field.translatesAutoresizingMaskIntoConstraints = false
             let formatter = NumberFormatter()
             formatter.minimum = NSNumber(value: min)
             formatter.maximum = NSNumber(value: max)
             formatter.allowsFloats = false
             field.formatter = formatter
+
+            let fieldContainer = NSView(frame: .zero)
+            fieldContainer.wantsLayer = true
+            fieldContainer.layer?.cornerRadius = 8
+            fieldContainer.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.45).cgColor
+            fieldContainer.translatesAutoresizingMaskIntoConstraints = false
+            fieldContainer.widthAnchor.constraint(equalToConstant: 64).isActive = true
+            fieldContainer.heightAnchor.constraint(equalToConstant: 30).isActive = true
+            fieldContainer.addSubview(field)
+
+            NSLayoutConstraint.activate([
+                field.leadingAnchor.constraint(equalTo: fieldContainer.leadingAnchor, constant: 8),
+                field.trailingAnchor.constraint(equalTo: fieldContainer.trailingAnchor, constant: -8),
+                field.centerYAnchor.constraint(equalTo: fieldContainer.centerYAnchor),
+            ])
 
             let stepper = NSStepper()
             stepper.minValue = Double(min)
@@ -747,13 +766,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             stepper.increment = 1
             stepper.valueWraps = false
             stepper.integerValue = value
+            stepper.controlSize = .small
 
             field.bind(.value, to: stepper, withKeyPath: "integerValue", options: nil)
             stepper.bind(.value, to: field, withKeyPath: "integerValue", options: nil)
 
-            let stack = NSStackView(views: [field, stepper])
+            let stack = NSStackView(views: [fieldContainer, stepper])
             stack.orientation = .horizontal
-            stack.spacing = 4
+            stack.spacing = 8
+            stack.alignment = .centerY
             return (stack, stepper)
         }
 
@@ -765,39 +786,103 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         func label(_ text: String) -> NSTextField {
             let l = NSTextField(labelWithString: text)
-            l.alignment = .right
+            l.alignment = .left
+            l.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+            l.textColor = NSColor.labelColor.withAlphaComponent(0.9)
             return l
         }
 
+        let titleLabel = NSTextField(labelWithString: "Timer Settings")
+        titleLabel.font = NSFont.systemFont(ofSize: 22, weight: .semibold)
+
+        let subtitleLabel = NSTextField(labelWithString: "Changes apply on the next phase transition.")
+        subtitleLabel.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        subtitleLabel.textColor = NSColor.secondaryLabelColor
+
+        let grid = NSGridView()
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        grid.rowSpacing = 12
+        grid.columnSpacing = 18
         grid.addRow(with: [label("Work duration (min):"), workRow.view])
         grid.addRow(with: [label("Short break (min):"), shortBreakRow.view])
         grid.addRow(with: [label("Long break (min):"), longBreakRow.view])
         grid.addRow(with: [label("Sessions before long break:"), sessionsRow.view])
         grid.addRow(with: [label("Extend break (min):"), extendBreakRow.view])
+        grid.column(at: 0).xPlacement = .leading
+        grid.column(at: 1).xPlacement = .trailing
+        for index in 0..<grid.numberOfRows {
+            grid.row(at: index).yPlacement = .center
+        }
 
         let blurCheckbox = NSButton(checkboxWithTitle: "Blur screen during breaks", target: nil, action: nil)
         blurCheckbox.state = settings.blurScreenDuringBreaks ? .on : .off
-        grid.addRow(with: [NSView(), blurCheckbox])
+        blurCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
         let saveButton = NSButton(title: "Save", target: nil, action: nil)
         saveButton.bezelStyle = .rounded
+        saveButton.controlSize = .large
         saveButton.keyEquivalent = "\r"
 
-        let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+        let cancelButton = NSButton(title: "Cancel", target: panel, action: #selector(NSWindow.performClose(_:)))
+        cancelButton.bezelStyle = .recessed
+        cancelButton.controlSize = .large
+        cancelButton.keyEquivalent = "\u{1b}"
+
+        let formCard = NSView(frame: .zero)
+        formCard.wantsLayer = true
+        formCard.layer?.cornerRadius = 14
+        formCard.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.5).cgColor
+        formCard.translatesAutoresizingMaskIntoConstraints = false
+        formCard.addSubview(grid)
+
+        let buttonRow = NSStackView(views: [cancelButton, saveButton])
+        buttonRow.orientation = .horizontal
+        buttonRow.spacing = 10
+        buttonRow.alignment = .centerY
+        buttonRow.distribution = .fillProportionally
+        buttonRow.translatesAutoresizingMaskIntoConstraints = false
+
+        let contentView = NSVisualEffectView(frame: panel.contentRect(forFrameRect: panel.frame))
+        contentView.material = .hudWindow
+        contentView.blendingMode = .behindWindow
+        contentView.state = .active
         contentView.translatesAutoresizingMaskIntoConstraints = false
-        grid.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        blurCheckbox.translatesAutoresizingMaskIntoConstraints = false
         saveButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(grid)
-        contentView.addSubview(saveButton)
+        cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(titleLabel)
+        contentView.addSubview(subtitleLabel)
+        contentView.addSubview(formCard)
+        contentView.addSubview(blurCheckbox)
+        contentView.addSubview(buttonRow)
 
         panel.contentView = contentView
 
         NSLayoutConstraint.activate([
-            grid.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            grid.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            saveButton.topAnchor.constraint(equalTo: grid.bottomAnchor, constant: 16),
-            saveButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            saveButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16),
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 26),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 26),
+
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -26),
+
+            formCard.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 16),
+            formCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 22),
+            formCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -22),
+
+            grid.topAnchor.constraint(equalTo: formCard.topAnchor, constant: 16),
+            grid.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 16),
+            grid.trailingAnchor.constraint(equalTo: formCard.trailingAnchor, constant: -16),
+            grid.bottomAnchor.constraint(equalTo: formCard.bottomAnchor, constant: -16),
+
+            blurCheckbox.topAnchor.constraint(equalTo: formCard.bottomAnchor, constant: 14),
+            blurCheckbox.leadingAnchor.constraint(equalTo: formCard.leadingAnchor, constant: 4),
+
+            buttonRow.topAnchor.constraint(equalTo: blurCheckbox.bottomAnchor, constant: 20),
+            buttonRow.trailingAnchor.constraint(equalTo: formCard.trailingAnchor),
+            buttonRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -22),
         ])
 
         saveButton.target = self
