@@ -172,22 +172,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func startTimer() {
         timer.start()
+        updateButton()
     }
 
     @objc private func resumeTimer() {
         timer.resume()
+        updateButton()
     }
 
     @objc private func pauseTimer() {
         timer.pause()
+        updateButton()
     }
 
     @objc private func unpauseTimer() {
         timer.unpause()
+        updateButton()
     }
 
     @objc private func stopTimer() {
         timer.stop()
+        updateButton()
     }
 
     @objc private func editMessage() {
@@ -208,11 +213,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         if response == .alertFirstButtonReturn {
             let text = input.stringValue
             timer.message = text.isEmpty ? nil : text
+            updateButton()
         }
     }
 
     @objc private func clearMessage() {
         timer.message = nil
+        updateButton()
     }
 
     @objc private func quit() {
