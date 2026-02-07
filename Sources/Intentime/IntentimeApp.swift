@@ -489,11 +489,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             effectView.blendingMode = .behindWindow
             effectView.state = .active
 
-            // Add a subtle dark tint for extra dimming.
+            // Add a very light dark tint while keeping the blur subtle.
             let tintView = NSView(frame: effectView.bounds)
             tintView.autoresizingMask = [.width, .height]
             tintView.wantsLayer = true
-            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.3).cgColor
+            tintView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.02).cgColor
             effectView.addSubview(tintView)
 
             window.contentView = effectView
@@ -504,7 +504,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.5
-                window.animator().alphaValue = 1
+                // Reduce overall effect strength so more of the screen remains visible.
+                window.animator().alphaValue = 0.7
             }
         }
     }
