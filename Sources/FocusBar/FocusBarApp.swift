@@ -41,8 +41,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let hasMessage = timer.message != nil
 
         if hasTimer || hasMessage {
-            let iconName = timer.isPaused ? "pause.circle" : "clock"
-            button.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Focus Timer")
+            if timer.isPaused {
+                button.image = NSImage(systemSymbolName: "pause.circle", accessibilityDescription: "Focus Timer")
+            } else if let seconds = timer.secondsLeft {
+                let progress = 1.0 - Double(seconds) / timer.focusDuration
+                button.image = progressCircleImage(progress: progress)
+            } else {
+                button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
+            }
             var parts: [String] = []
             if let time = timer.formattedTime {
                 parts.append(time)
@@ -57,6 +63,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.title = ""
             button.imagePosition = .imageOnly
         }
+    }
+
+    private func progressCircleImage(progress: Double) -> NSImage {
+        let size: CGFloat = 18
+        let lineWidth: CGFloat = 1.5
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let radius = (min(rect.width, rect.height) - lineWidth) / 2.0
+
+            // Draw background circle (track)
+            context.setStrokeColor(NSColor.secondaryLabelColor.cgColor)
+            context.setLineWidth(lineWidth)
+            context.addArc(center: center, radius: radius, startAngle: 0, endAngle: 2 * .pi, clockwise: false)
+            context.strokePath()
+
+            // Draw filled progress arc (clockwise from 12 o'clock)
+            if progress > 0 {
+                let startAngle = CGFloat.pi / 2 // 12 o'clock
+                let endAngle = startAngle - CGFloat(progress) * 2 * .pi
+
+                context.setFillColor(NSColor.labelColor.cgColor)
+                context.move(to: center)
+                context.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: true)
+                context.closePath()
+                context.fillPath()
+            }
+
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {

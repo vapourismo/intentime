@@ -8,7 +8,7 @@ final class TimerModel: ObservableObject {
     @Published var isPaused: Bool = false
     @Published var message: String?
 
-    private let focusDuration: TimeInterval = 25 * 60
+    let focusDuration: TimeInterval = 25 * 60
     private let endTimeKey = "endTime"
     private let pausedSecondsKey = "pausedSecondsLeft"
     private let messageKey = "focusMessage"
