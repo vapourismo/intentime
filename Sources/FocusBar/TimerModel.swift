@@ -31,56 +31,52 @@ final class TimerModel: ObservableObject {
         return Int(endTime - Date.now.timeIntervalSince1970) > 0
     }
 
-    /// The focus message of a persisted previous session, if any.
-    var previousSessionMessage: String? {
-        guard hasPreviousSession else { return nil }
-        return UserDefaults.standard.string(forKey: messageKey)
+    init() {
+        // Restore persisted message (independent of timer)
+        message = UserDefaults.standard.string(forKey: messageKey)
     }
-
-    init() {}
 
     func resume() {
-        restoreIfNeeded()
+        restoreTimer()
     }
 
-    func start(message: String?) {
+    func start() {
         let endTime = Date.now.timeIntervalSince1970 + focusDuration
         UserDefaults.standard.set(endTime, forKey: endTimeKey)
-        let trimmed = message?.trimmingCharacters(in: .whitespaces)
-        if let trimmed, !trimmed.isEmpty {
-            self.message = trimmed
-            UserDefaults.standard.set(trimmed, forKey: messageKey)
-        } else {
-            self.message = nil
-            UserDefaults.standard.removeObject(forKey: messageKey)
-        }
         tick()
         startTimer()
     }
 
     func stop() {
         UserDefaults.standard.removeObject(forKey: endTimeKey)
-        UserDefaults.standard.removeObject(forKey: messageKey)
         secondsLeft = nil
-        message = nil
         timerCancellable?.cancel()
         timerCancellable = nil
         updateDerived()
     }
 
-    private func restoreIfNeeded() {
+    func setMessage(_ text: String?) {
+        let trimmed = text?.trimmingCharacters(in: .whitespaces)
+        if let trimmed, !trimmed.isEmpty {
+            message = trimmed
+            UserDefaults.standard.set(trimmed, forKey: messageKey)
+        } else {
+            message = nil
+            UserDefaults.standard.removeObject(forKey: messageKey)
+        }
+    }
+
+    private func restoreTimer() {
         let endTime = UserDefaults.standard.double(forKey: endTimeKey)
         guard endTime > 0 else { return }
 
         let remaining = Int(endTime - Date.now.timeIntervalSince1970)
         if remaining > 0 {
             secondsLeft = remaining
-            message = UserDefaults.standard.string(forKey: messageKey)
             updateDerived()
             startTimer()
         } else {
             UserDefaults.standard.removeObject(forKey: endTimeKey)
-            UserDefaults.standard.removeObject(forKey: messageKey)
         }
     }
 

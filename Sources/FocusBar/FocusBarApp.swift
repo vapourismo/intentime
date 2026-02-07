@@ -34,13 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
 
-        if let time = timer.formattedTime {
+        let hasTimer = timer.formattedTime != nil
+        let hasMessage = timer.message != nil
+
+        if hasTimer || hasMessage {
             button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
-            if let message = timer.message {
-                button.title = " \(time) — \(message)"
-            } else {
-                button.title = " \(time)"
+            var parts: [String] = []
+            if let time = timer.formattedTime {
+                parts.append(time)
             }
+            if let message = timer.message {
+                parts.append(message)
+            }
+            button.title = " " + parts.joined(separator: " — ")
             button.imagePosition = .imageLeading
         } else {
             button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
@@ -49,27 +55,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
+
+        // Timer section
         if timer.isRunning {
-            let stopItem = NSMenuItem(title: "Stop", action: #selector(stopTimer), keyEquivalent: "")
+            let stopItem = NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: "")
             stopItem.target = self
             menu.addItem(stopItem)
         } else {
-            let startItem = NSMenuItem(title: "Start Focus Session", action: #selector(startTimer), keyEquivalent: "")
+            let startItem = NSMenuItem(title: "Start Timer", action: #selector(startTimer), keyEquivalent: "")
             startItem.target = self
             menu.addItem(startItem)
 
             if timer.hasPreviousSession {
-                let title: String
-                if let msg = timer.previousSessionMessage {
-                    title = "Continue: \(msg)"
-                } else {
-                    title = "Continue Previous Session"
-                }
-                let continueItem = NSMenuItem(title: title, action: #selector(resumeTimer), keyEquivalent: "")
+                let continueItem = NSMenuItem(title: "Continue Previous Timer", action: #selector(resumeTimer), keyEquivalent: "")
                 continueItem.target = self
                 menu.addItem(continueItem)
             }
         }
+
+        menu.addItem(.separator())
+
+        // Message section
+        if timer.message != nil {
+            let editItem = NSMenuItem(title: "Edit Message…", action: #selector(editMessage), keyEquivalent: "")
+            editItem.target = self
+            menu.addItem(editItem)
+
+            let clearItem = NSMenuItem(title: "Clear Message", action: #selector(clearMessage), keyEquivalent: "")
+            clearItem.target = self
+            menu.addItem(clearItem)
+        } else {
+            let setItem = NSMenuItem(title: "Set Message…", action: #selector(editMessage), keyEquivalent: "")
+            setItem.target = self
+            menu.addItem(setItem)
+        }
+
         menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
@@ -78,21 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func startTimer() {
-        let alert = NSAlert()
-        alert.messageText = "Start Focus Session"
-        alert.informativeText = "What are you focusing on?"
-        alert.addButton(withTitle: "Start")
-        alert.addButton(withTitle: "Cancel")
-
-        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        input.placeholderString = "e.g. Write blog post"
-        alert.accessoryView = input
-        alert.window.initialFirstResponder = input
-
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            timer.start(message: input.stringValue)
-        }
+        timer.start()
     }
 
     @objc private func resumeTimer() {
@@ -101,6 +107,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func stopTimer() {
         timer.stop()
+    }
+
+    @objc private func editMessage() {
+        let alert = NSAlert()
+        alert.messageText = "Focus Message"
+        alert.informativeText = "What are you focusing on?"
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        input.placeholderString = "e.g. Write blog post"
+        input.stringValue = timer.message ?? ""
+        alert.accessoryView = input
+        alert.window.initialFirstResponder = input
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            let text = input.stringValue
+            timer.setMessage(text.isEmpty ? nil : text)
+        }
+    }
+
+    @objc private func clearMessage() {
+        timer.setMessage(nil)
     }
 
     @objc private func quit() {
