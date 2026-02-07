@@ -170,7 +170,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             continueItem.target = self
             menu.addItem(continueItem)
 
-            let extendItem = NSMenuItem(title: "Extend Break (+\(Settings.shared.shortBreakMinutes) min)", action: #selector(extendBreakFromPrompt), keyEquivalent: "")
+            let extendItem = NSMenuItem(title: "Extend Break (+\(Settings.shared.extendBreakMinutes) min)", action: #selector(extendBreakFromPrompt), keyEquivalent: "")
             extendItem.target = self
             menu.addItem(extendItem)
 
@@ -390,7 +390,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let continueButton = NSButton(title: "Continue", target: self, action: #selector(continueFromPrompt))
         continueButton.bezelStyle = .rounded
         continueButton.keyEquivalent = "\r"
-        let extendButton = NSButton(title: "+\(Settings.shared.shortBreakMinutes) min", target: self, action: #selector(extendBreakFromPrompt))
+        let extendButton = NSButton(title: "+\(Settings.shared.extendBreakMinutes) min", target: self, action: #selector(extendBreakFromPrompt))
         extendButton.bezelStyle = .rounded
         let stopButton = NSButton(title: "Stop", target: self, action: #selector(stopFromPrompt))
         stopButton.bezelStyle = .rounded
@@ -502,6 +502,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let shortBreakRow = makeStepperRow(value: settings.shortBreakMinutes, min: 1, max: 60)
         let longBreakRow = makeStepperRow(value: settings.longBreakMinutes, min: 1, max: 120)
         let sessionsRow = makeStepperRow(value: settings.sessionsBeforeLongBreak, min: 1, max: 20)
+        let extendBreakRow = makeStepperRow(value: settings.extendBreakMinutes, min: 1, max: 60)
 
         func label(_ text: String) -> NSTextField {
             let l = NSTextField(labelWithString: text)
@@ -513,6 +514,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         grid.addRow(with: [label("Short break (min):"), shortBreakRow.view])
         grid.addRow(with: [label("Long break (min):"), longBreakRow.view])
         grid.addRow(with: [label("Sessions before long break:"), sessionsRow.view])
+        grid.addRow(with: [label("Extend break (min):"), extendBreakRow.view])
 
         let saveButton = NSButton(title: "Save", target: nil, action: nil)
         saveButton.bezelStyle = .rounded
@@ -541,7 +543,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         // Store steppers so we can read them on save.
         panel.contentView?.setAssociatedFields(
             work: workRow.stepper, shortBreak: shortBreakRow.stepper,
-            longBreak: longBreakRow.stepper, sessions: sessionsRow.stepper)
+            longBreak: longBreakRow.stepper, sessions: sessionsRow.stepper,
+            extendBreak: extendBreakRow.stepper)
 
         panel.center()
         panel.makeKeyAndOrderFront(nil)
@@ -557,6 +560,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         settings.shortBreakMinutes = fields.shortBreak.integerValue
         settings.longBreakMinutes = fields.longBreak.integerValue
         settings.sessionsBeforeLongBreak = fields.sessions.integerValue
+        settings.extendBreakMinutes = fields.extendBreak.integerValue
         settingsPanel?.close()
         settingsPanel = nil
     }
@@ -573,15 +577,18 @@ private struct SettingsFields {
     let shortBreak: NSStepper
     let longBreak: NSStepper
     let sessions: NSStepper
+    let extendBreak: NSStepper
 }
 
 private var settingsFieldsKey: UInt8 = 0
 
 private extension NSView {
     func setAssociatedFields(work: NSStepper, shortBreak: NSStepper,
-                             longBreak: NSStepper, sessions: NSStepper) {
+                             longBreak: NSStepper, sessions: NSStepper,
+                             extendBreak: NSStepper) {
         let fields = SettingsFields(work: work, shortBreak: shortBreak,
-                                    longBreak: longBreak, sessions: sessions)
+                                    longBreak: longBreak, sessions: sessions,
+                                    extendBreak: extendBreak)
         objc_setAssociatedObject(self, &settingsFieldsKey, fields, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 

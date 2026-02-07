@@ -8,6 +8,7 @@ final class Settings {
         static let shortBreakMinutes = "settings.shortBreakMinutes"
         static let longBreakMinutes = "settings.longBreakMinutes"
         static let sessionsBeforeLongBreak = "settings.sessionsBeforeLongBreak"
+        static let extendBreakMinutes = "settings.extendBreakMinutes"
     }
 
     private enum Default {
@@ -15,6 +16,7 @@ final class Settings {
         static let shortBreakMinutes = 5
         static let longBreakMinutes = 20
         static let sessionsBeforeLongBreak = 4
+        static let extendBreakMinutes = 5
     }
 
     var workMinutes: Int {
@@ -35,6 +37,11 @@ final class Settings {
     var sessionsBeforeLongBreak: Int {
         get { stored(DefaultsKey.sessionsBeforeLongBreak, default: Default.sessionsBeforeLongBreak) }
         set { UserDefaults.standard.set(newValue, forKey: DefaultsKey.sessionsBeforeLongBreak) }
+    }
+
+    var extendBreakMinutes: Int {
+        get { stored(DefaultsKey.extendBreakMinutes, default: Default.extendBreakMinutes) }
+        set { UserDefaults.standard.set(newValue, forKey: DefaultsKey.extendBreakMinutes) }
     }
 
     private func stored(_ key: String, default fallback: Int) -> Int {

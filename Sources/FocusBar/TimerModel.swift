@@ -148,13 +148,19 @@ final class TimerModel {
         startPhase()
     }
 
-    /// Extend the break by starting a short break phase from the waiting state.
+    /// Extend the break by the configured extend-break duration.
     func extendBreak() {
         guard isWaitingToStart else { return }
         isWaitingToStart = false
         phase = .shortBreak
         persistPhaseState()
-        startPhase()
+        let duration = TimeInterval(settings.extendBreakMinutes * 60)
+        let endTime = Date.now.timeIntervalSince1970 + duration
+        UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        flushDefaults()
+        tick()
+        startTimer()
     }
 
     private func advancePhase(notify: Bool = true) {
