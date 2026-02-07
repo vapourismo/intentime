@@ -58,7 +58,7 @@ Sources/FocusBar/
 ## Gotchas
 
 - Nix files must be staged in git before `nix flake update` will see them
-- The flake uses `mkShellNoCC` and unsets `SDKROOT`/`DEVELOPER_DIR`/`NIX_CFLAGS_COMPILE`/`NIX_LDFLAGS` in `shellHook` — Nix's default darwin SDK is incompatible with the Xcode Swift toolchain
+- **Nix + Swift SDK mismatch:** Nix injects `SDKROOT`, `DEVELOPER_DIR`, `NIX_CFLAGS_COMPILE`, `NIX_LDFLAGS`, `MACOSX_DEPLOYMENT_TARGET` pointing to an old Apple SDK incompatible with the host Xcode Swift compiler. The `.envrc` unsets these after `use flake` so `swift build` just works. If you see `failed to build module 'Swift'; this SDK is not supported by the compiler`, check that these vars are unset. Note: `shellHook` in `flake.nix` only runs in interactive `nix develop` — `direnv` does NOT execute it, which is why the unset must live in `.envrc`
 - SwiftUI `MenuBarExtra` does not reliably re-render its label from `@StateObject`/`@ObservedObject` changes — this is why we use AppKit `NSStatusItem` instead
 - `Timer.publish` must use `.common` RunLoop mode, otherwise the timer pauses when the menu dropdown is open
 - The app is a menu-bar-only app (no main window); `NSApplication.setActivationPolicy(.accessory)` hides the Dock icon
