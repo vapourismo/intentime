@@ -23,7 +23,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         timer.onAutoPhaseChange = { [weak self] phase in
-            self?.showBreakBanner(for: phase)
+            self?.showPhaseBanner(for: phase)
         }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -260,12 +260,20 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         updateButton()
     }
 
-    private func showBreakBanner(for phase: TimerModel.Phase) {
-        guard phase == .shortBreak || phase == .longBreak else { return }
-        let title = phase == .longBreak ? "Long Break" : "Short Break"
-        let body = phase == .longBreak
-            ? "Great work! Take a 20-minute break."
-            : "Take a 5-minute break."
+    private func showPhaseBanner(for phase: TimerModel.Phase) {
+        let title: String
+        let body: String
+        switch phase {
+        case .work:
+            title = "Back to Work"
+            body = "Break's over — time to focus!"
+        case .shortBreak:
+            title = "Short Break"
+            body = "Take a 5-minute break."
+        case .longBreak:
+            title = "Long Break"
+            body = "Great work! Take a 20-minute break."
+        }
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 64),
