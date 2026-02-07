@@ -1,6 +1,7 @@
 import AppKit
 import Carbon
 
+/// Entry point. Configures the app as a menu-bar-only agent (no Dock icon) and starts the run loop.
 @main
 enum FocusBarApp {
     static func main() {
@@ -12,12 +13,22 @@ enum FocusBarApp {
     }
 }
 
+/// Main application controller owning the `NSStatusItem`, timer model, and all UI panels.
+///
+/// Uses `NSMenuDelegate` to rebuild the menu on demand (via ``menuNeedsUpdate(_:)``)
+/// and a 0.5 s polling timer in `.common` run-loop mode to keep the menu bar title
+/// updated even while the dropdown is open.
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let timer = TimerModel()
+    /// Polls `TimerModel` every 0.5 s to refresh the status item button. Runs in `.common` mode
+    /// so it fires during `NSMenu` event tracking.
     private var displayTimer: Timer?
+    /// The floating HUD shown when a break ends, prompting the user to continue/extend/stop.
     private var promptPanel: NSPanel?
+    /// The Spotlight-like HUD for entering/editing the focus message.
     private var messagePanel: NSPanel?
+    /// System-wide shortcut registration (Cmd+Shift+Space).
     private var globalHotKey: GlobalHotKey?
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -58,6 +69,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
     }
 
+    /// Refresh the status item's icon and title to reflect the current timer/message state.
+    ///
+    /// Title format: `MM:SS — message` (both), `MM:SS` (timer only), `message` (message only).
+    /// Icon: progress pie during work, cup during break, pause symbol when paused, clock when idle.
     private func updateButton() {
         guard let button = statusItem.button else { return }
 
@@ -117,6 +132,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
     }
 
+    /// Draw a template image of a pie-chart circle filling clockwise from 12 o'clock.
+    ///
+    /// - Parameter progress: 0.0 (empty) to 1.0 (full).
     private func progressCircleImage(progress: Double) -> NSImage {
         let size: CGFloat = 18
         let lineWidth: CGFloat = 1.5
@@ -150,6 +168,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         return image
     }
 
+    /// Rebuild the entire menu each time it opens, reflecting the current timer state.
+    ///
+    /// Called by AppKit because `self` is the menu's `delegate`. Items and layout
+    /// depend on the current phase: idle, running (work/break), paused, or waiting to start.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
@@ -254,40 +276,54 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         menu.addItem(quitItem)
     }
 
+    // MARK: - Menu actions
+
+    /// Start a fresh Pomodoro cycle.
     @objc private func startTimer() {
         timer.start()
         updateButton()
     }
 
+    /// Resume a previously persisted session.
     @objc private func resumeTimer() {
         timer.resume()
         updateButton()
     }
 
+    /// Pause the running work timer.
     @objc private func pauseTimer() {
         timer.pause()
         updateButton()
     }
 
+    /// Resume a paused timer.
     @objc private func unpauseTimer() {
         timer.unpause()
         updateButton()
     }
 
+    /// Stop the timer and reset to idle.
     @objc private func stopTimer() {
         timer.stop()
         updateButton()
     }
 
+    /// Skip the current phase (work → break or break → work).
     @objc private func skipPhase() {
         timer.skip()
         updateButton()
     }
 
+    /// Open the message input HUD (same panel used by the global hotkey).
     @objc private func editMessage() {
         showMessageInput()
     }
 
+    // MARK: - Message input panel
+
+    /// Show (or toggle off) the Spotlight-like floating HUD for entering the focus message.
+    ///
+    /// Enter confirms, Escape cancels. If the panel is already visible, it is dismissed instead.
     private func showMessageInput() {
         if let existing = messagePanel, existing.isVisible {
             dismissMessagePanel()
@@ -348,6 +384,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         messagePanel = panel
     }
 
+    /// Called when the user presses Enter in the message text field.
     @objc private func messageFieldSubmitted(_ sender: NSTextField) {
         let text = sender.stringValue.trimmingCharacters(in: .whitespaces)
         timer.message = text.isEmpty ? nil : text
@@ -355,6 +392,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         dismissMessagePanel()
     }
 
+    /// Fade out and close the message input panel.
     private func dismissMessagePanel() {
         guard let panel = messagePanel else { return }
         messagePanel = nil
@@ -366,11 +404,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         })
     }
 
+    /// Clear the focus message and update the menu bar.
     @objc private func clearMessage() {
         timer.message = nil
         updateButton()
     }
 
+    // MARK: - Notifications
+
+    /// Flash an orange glow along the borders of all screens to signal a break starting.
+    ///
+    /// The glow fades out over 2 seconds after a 0.3 s hold. Uses `BorderFlashView` for the gradient.
     private func flashScreenBorder() {
         let glowWidth: CGFloat = 40
         let color = NSColor.systemOrange
@@ -409,6 +453,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
     }
 
+    /// Show a temporary HUD banner in the top-right corner announcing a break phase.
+    ///
+    /// Auto-dismisses after 4 seconds. Only shown for break phases (not work).
     private func showPhaseBanner(for phase: TimerModel.Phase) {
         guard phase == .shortBreak || phase == .longBreak else { return }
         flashScreenBorder()
@@ -472,6 +519,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         NSSound.beep()
     }
 
+    /// Show a persistent HUD prompt when a break ends, offering "Continue", "Extend Break", and "Stop".
+    ///
+    /// The prompt stays visible until the user interacts with one of the buttons.
     private func showBreakEndedPrompt() {
         dismissPromptPanel()
 
@@ -533,32 +583,41 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         NSSound.beep()
     }
 
+    /// Close the break-ended prompt panel.
     private func dismissPromptPanel() {
         promptPanel?.close()
         promptPanel = nil
     }
 
+    /// User chose "Continue" — start the next work session.
     @objc private func continueFromPrompt() {
         dismissPromptPanel()
         timer.startNextWork()
         updateButton()
     }
 
+    /// User chose "Extend Break" — add more break time.
     @objc private func extendBreakFromPrompt() {
         dismissPromptPanel()
         timer.extendBreak()
         updateButton()
     }
 
+    /// User chose "Stop" — end the Pomodoro session entirely.
     @objc private func stopFromPrompt() {
         dismissPromptPanel()
         timer.stop()
         updateButton()
     }
 
+    /// Windows used for the screen-border flash animation (one per display).
     private var flashWindows: [NSWindow] = []
+    /// The currently open settings panel, if any.
     private var settingsPanel: NSPanel?
 
+    // MARK: - Settings
+
+    /// Open (or bring to front) the settings panel with stepper controls for all durations.
     @objc private func openSettings() {
         if let existing = settingsPanel, existing.isVisible {
             existing.makeKeyAndOrderFront(nil)
@@ -663,6 +722,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         settingsPanel = panel
     }
 
+    /// Read current stepper values from the settings panel and persist them.
     @objc private func saveSettings(_ sender: Any?) {
         guard let contentView = settingsPanel?.contentView,
               let fields = contentView.associatedFields() else { return }
@@ -683,6 +743,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
 // MARK: - Message text field (Escape handling)
 
+/// `NSTextField` subclass that forwards Escape key presses to an ``onEscape`` closure,
+/// used by the message input panel to dismiss on Escape.
 private final class MessageTextField: NSTextField {
     var onEscape: (() -> Void)?
 
@@ -693,6 +755,7 @@ private final class MessageTextField: NSTextField {
 
 // MARK: - Associated fields helper
 
+/// Bundles the `NSStepper` references from the settings panel so they can be read back on save.
 private struct SettingsFields {
     let work: NSStepper
     let shortBreak: NSStepper
@@ -703,10 +766,13 @@ private struct SettingsFields {
 
 // MARK: - Border flash view
 
+/// Custom view that draws a soft gradient glow along all four edges of its bounds,
+/// used by ``AppDelegate/flashScreenBorder()`` to overlay full-screen flash windows.
 private final class BorderFlashView: NSView {
     var glowWidth: CGFloat = 40
     var glowColor: NSColor = .systemGreen
 
+    /// Draw gradient strips along each edge (bottom, top, left, right).
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         let w = glowWidth
@@ -721,6 +787,7 @@ private final class BorderFlashView: NSView {
                  startPoint: CGPoint(x: bounds.width, y: 0), endPoint: CGPoint(x: bounds.width - w, y: 0)) // right
     }
 
+    /// Draw a single edge gradient from `startPoint` (opaque) to `endPoint` (transparent), clipped to `rect`.
     private func drawEdge(context: CGContext, rect: NSRect, startPoint: CGPoint, endPoint: CGPoint) {
         let edgeColor = glowColor.withAlphaComponent(0.6)
         let clearColor = glowColor.withAlphaComponent(0.0)
@@ -735,8 +802,11 @@ private final class BorderFlashView: NSView {
     }
 }
 
+/// Associated-object key for attaching ``SettingsFields`` to the settings panel's content view.
 private var settingsFieldsKey: UInt8 = 0
 
+/// Convenience for stashing/retrieving ``SettingsFields`` on the settings panel content view
+/// via Objective-C associated objects so the save action can read stepper values.
 private extension NSView {
     func setAssociatedFields(work: NSStepper, shortBreak: NSStepper,
                              longBreak: NSStepper, sessions: NSStepper,
