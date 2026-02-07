@@ -36,7 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let time = timer.formattedTime {
             button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
-            button.title = " \(time)"
+            if let message = timer.message {
+                button.title = " \(time) — \(message)"
+            } else {
+                button.title = " \(time)"
+            }
             button.imagePosition = .imageLeading
         } else {
             button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
@@ -62,7 +66,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func startTimer() {
-        timer.start()
+        let alert = NSAlert()
+        alert.messageText = "Start Focus Session"
+        alert.informativeText = "What are you focusing on?"
+        alert.addButton(withTitle: "Start")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        input.placeholderString = "e.g. Write blog post"
+        alert.accessoryView = input
+        alert.window.initialFirstResponder = input
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            timer.start(message: input.stringValue)
+        }
     }
 
     @objc private func stopTimer() {
