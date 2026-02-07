@@ -252,7 +252,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         // Message section
         if timer.message != nil {
-            let editItem = NSMenuItem(title: "Edit Message…", action: #selector(editMessage), keyEquivalent: "")
+            let editItem = NSMenuItem(title: "Edit Message", action: #selector(editMessage), keyEquivalent: "")
             editItem.target = self
             menu.addItem(editItem)
 
@@ -260,13 +260,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             clearItem.target = self
             menu.addItem(clearItem)
         } else {
-            let setItem = NSMenuItem(title: "Set Message…", action: #selector(editMessage), keyEquivalent: "")
+            let setItem = NSMenuItem(title: "Set Message", action: #selector(editMessage), keyEquivalent: "")
             setItem.target = self
             menu.addItem(setItem)
         }
 
         menu.addItem(.separator())
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settings", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
 
