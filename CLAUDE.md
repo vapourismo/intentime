@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file is the source of truth for project conventions and context. Keep it up to date: when you discover something important during a session (new tooling, conventions, gotchas, architectural decisions), add it to the relevant section below before finishing your work.
+This file is the source of truth for project conventions and context. **Any change to the codebase — new files, dependencies, commands, architectural decisions, or gotchas — must be reflected here before finishing your work.** Keep every section accurate and up to date.
 
 ## Project Overview
 
