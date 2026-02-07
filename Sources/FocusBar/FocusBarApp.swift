@@ -300,8 +300,47 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         updateButton()
     }
 
+    private func flashScreenBorder() {
+        let glowWidth: CGFloat = 40
+        let color = NSColor.systemGreen
+
+        for screen in NSScreen.screens {
+            let frame = screen.frame
+            let window = NSWindow(
+                contentRect: frame,
+                styleMask: [.borderless],
+                backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.level = .screenSaver
+            window.ignoresMouseEvents = true
+            window.collectionBehavior = [.canJoinAllSpaces, .stationary]
+
+            let borderView = BorderFlashView(frame: NSRect(origin: .zero, size: frame.size))
+            borderView.glowWidth = glowWidth
+            borderView.glowColor = color
+            window.contentView = borderView
+            window.setFrame(frame, display: true)
+            window.alphaValue = 1
+            window.orderFrontRegardless()
+            self.flashWindows.append(window)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                NSAnimationContext.runAnimationGroup({ ctx in
+                    ctx.duration = 0.8
+                    window.animator().alphaValue = 0
+                }, completionHandler: { [weak self] in
+                    window.close()
+                    self?.flashWindows.removeAll { $0 === window }
+                })
+            }
+        }
+    }
+
     private func showPhaseBanner(for phase: TimerModel.Phase) {
         guard phase == .shortBreak || phase == .longBreak else { return }
+        flashScreenBorder()
         let settings = Settings.shared
         let title = phase == .longBreak ? "Long Break" : "Short Break"
         let minutes = phase == .longBreak ? settings.longBreakMinutes : settings.shortBreakMinutes
@@ -446,6 +485,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         updateButton()
     }
 
+    private var flashWindows: [NSWindow] = []
     private var settingsPanel: NSPanel?
 
     @objc private func openSettings() {
@@ -578,6 +618,40 @@ private struct SettingsFields {
     let longBreak: NSStepper
     let sessions: NSStepper
     let extendBreak: NSStepper
+}
+
+// MARK: - Border flash view
+
+private final class BorderFlashView: NSView {
+    var glowWidth: CGFloat = 40
+    var glowColor: NSColor = .systemGreen
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        let w = glowWidth
+        // Draw gradient strips along each edge.
+        drawEdge(context: context, rect: NSRect(x: 0, y: 0, width: bounds.width, height: w),
+                 startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: w)) // bottom
+        drawEdge(context: context, rect: NSRect(x: 0, y: bounds.height - w, width: bounds.width, height: w),
+                 startPoint: CGPoint(x: 0, y: bounds.height), endPoint: CGPoint(x: 0, y: bounds.height - w)) // top
+        drawEdge(context: context, rect: NSRect(x: 0, y: 0, width: w, height: bounds.height),
+                 startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: w, y: 0)) // left
+        drawEdge(context: context, rect: NSRect(x: bounds.width - w, y: 0, width: w, height: bounds.height),
+                 startPoint: CGPoint(x: bounds.width, y: 0), endPoint: CGPoint(x: bounds.width - w, y: 0)) // right
+    }
+
+    private func drawEdge(context: CGContext, rect: NSRect, startPoint: CGPoint, endPoint: CGPoint) {
+        let edgeColor = glowColor.withAlphaComponent(0.6)
+        let clearColor = glowColor.withAlphaComponent(0.0)
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [edgeColor.cgColor, clearColor.cgColor] as CFArray,
+            locations: [0, 1]) else { return }
+        context.saveGState()
+        context.clip(to: rect)
+        context.drawLinearGradient(gradient, start: startPoint, end: endPoint, options: [])
+        context.restoreGState()
+    }
 }
 
 private var settingsFieldsKey: UInt8 = 0
