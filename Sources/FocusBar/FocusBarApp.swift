@@ -47,12 +47,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         if hasTimer || hasMessage {
             if timer.isPaused {
-                button.image = NSImage(systemSymbolName: "pause.fill", accessibilityDescription: "Focus Timer")
-            } else if let seconds = timer.secondsLeft {
-                let progress = 1.0 - Double(seconds) / timer.focusDuration
+                button.image = NSImage(systemSymbolName: "pause.fill", accessibilityDescription: "Pomodoro Timer")
+            } else if timer.phase == .work, let seconds = timer.secondsLeft {
+                let progress = 1.0 - Double(seconds) / timer.phaseDuration
                 button.image = progressCircleImage(progress: progress)
+            } else if timer.phase == .shortBreak || timer.phase == .longBreak {
+                button.image = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: "Break")
             } else {
-                button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
+                button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Pomodoro Timer")
             }
             var parts: [(text: String, font: NSFont)] = []
             let monoDigitFont = NSFont.monospacedDigitSystemFont(
@@ -76,7 +78,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             button.attributedTitle = attributed
             button.imagePosition = .imageLeading
         } else {
-            button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
+            button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Pomodoro Timer")
             button.title = ""
             button.imagePosition = .imageOnly
         }
@@ -118,30 +120,57 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
+        if timer.isRunning || timer.isPaused {
+            // Phase info header
+            let phaseLabel: String
+            switch timer.phase {
+            case .work:
+                phaseLabel = "Work"
+            case .shortBreak:
+                phaseLabel = "Short Break"
+            case .longBreak:
+                phaseLabel = "Long Break"
+            }
+            let phaseItem = NSMenuItem(title: phaseLabel, action: nil, keyEquivalent: "")
+            phaseItem.isEnabled = false
+            menu.addItem(phaseItem)
+            menu.addItem(.separator())
+        }
+
         // Timer section
         if timer.isRunning {
-            let pauseItem = NSMenuItem(title: "Pause Timer", action: #selector(pauseTimer), keyEquivalent: "")
-            pauseItem.target = self
-            menu.addItem(pauseItem)
+            if timer.phase == .work {
+                let pauseItem = NSMenuItem(title: "Pause", action: #selector(pauseTimer), keyEquivalent: "")
+                pauseItem.target = self
+                menu.addItem(pauseItem)
 
-            let stopItem = NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: "")
+                let skipItem = NSMenuItem(title: "Skip to Break", action: #selector(skipPhase), keyEquivalent: "")
+                skipItem.target = self
+                menu.addItem(skipItem)
+            } else {
+                let skipItem = NSMenuItem(title: "Skip Break", action: #selector(skipPhase), keyEquivalent: "")
+                skipItem.target = self
+                menu.addItem(skipItem)
+            }
+
+            let stopItem = NSMenuItem(title: "Stop", action: #selector(stopTimer), keyEquivalent: "")
             stopItem.target = self
             menu.addItem(stopItem)
         } else if timer.isPaused {
-            let resumeItem = NSMenuItem(title: "Resume Timer", action: #selector(unpauseTimer), keyEquivalent: "")
+            let resumeItem = NSMenuItem(title: "Resume", action: #selector(unpauseTimer), keyEquivalent: "")
             resumeItem.target = self
             menu.addItem(resumeItem)
 
-            let stopItem = NSMenuItem(title: "Stop Timer", action: #selector(stopTimer), keyEquivalent: "")
+            let stopItem = NSMenuItem(title: "Stop", action: #selector(stopTimer), keyEquivalent: "")
             stopItem.target = self
             menu.addItem(stopItem)
         } else {
-            let startItem = NSMenuItem(title: "Start Timer", action: #selector(startTimer), keyEquivalent: "")
+            let startItem = NSMenuItem(title: "Start Pomodoro", action: #selector(startTimer), keyEquivalent: "")
             startItem.target = self
             menu.addItem(startItem)
 
             if timer.hasPreviousSession {
-                let continueItem = NSMenuItem(title: "Continue Previous Timer", action: #selector(resumeTimer), keyEquivalent: "")
+                let continueItem = NSMenuItem(title: "Continue Previous Session", action: #selector(resumeTimer), keyEquivalent: "")
                 continueItem.target = self
                 menu.addItem(continueItem)
             }
@@ -192,6 +221,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func stopTimer() {
         timer.stop()
+        updateButton()
+    }
+
+    @objc private func skipPhase() {
+        timer.skip()
         updateButton()
     }
 

@@ -1,10 +1,20 @@
 import Foundation
 
 final class TimerModel {
+    enum Phase: String {
+        case work
+        case shortBreak
+        case longBreak
+    }
+
     private(set) var secondsLeft: Int?
     private(set) var formattedTime: String?
     private(set) var isRunning = false
     private(set) var isPaused = false
+    private(set) var phase: Phase = .work
+    private(set) var pomodorosCompleted: Int = 0
+
+    static let pomodorosPerCycle = 4
 
     var message: String? {
         get { _message }
@@ -21,7 +31,14 @@ final class TimerModel {
         }
     }
 
-    let focusDuration: TimeInterval = 25 * 60
+    /// Duration for the current phase.
+    var phaseDuration: TimeInterval {
+        switch phase {
+        case .work: return 25 * 60
+        case .shortBreak: return 5 * 60
+        case .longBreak: return 20 * 60
+        }
+    }
 
     private var _message: String?
     private var timer: Timer?
@@ -30,10 +47,17 @@ final class TimerModel {
         static let endTime = "endTime"
         static let pausedSecondsLeft = "pausedSecondsLeft"
         static let message = "focusMessage"
+        static let phase = "pomodoroPhase"
+        static let pomodorosCompleted = "pomodorosCompleted"
     }
 
     init() {
         _message = UserDefaults.standard.string(forKey: DefaultsKey.message)
+        if let savedPhase = UserDefaults.standard.string(forKey: DefaultsKey.phase),
+           let restored = Phase(rawValue: savedPhase) {
+            phase = restored
+        }
+        pomodorosCompleted = UserDefaults.standard.integer(forKey: DefaultsKey.pomodorosCompleted)
     }
 
     /// Whether a previous session is persisted and still has time remaining.
@@ -51,12 +75,14 @@ final class TimerModel {
     }
 
     func start() {
-        let endTime = Date.now.timeIntervalSince1970 + focusDuration
-        UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
-        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
-        flushDefaults()
-        tick()
-        startTimer()
+        phase = .work
+        pomodorosCompleted = 0
+        persistPhaseState()
+        startPhase()
+    }
+
+    func skip() {
+        advancePhase()
     }
 
     func pause() {
@@ -84,15 +110,57 @@ final class TimerModel {
     func stop() {
         UserDefaults.standard.removeObject(forKey: DefaultsKey.endTime)
         UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.phase)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pomodorosCompleted)
         flushDefaults()
         isPaused = false
         secondsLeft = nil
+        phase = .work
+        pomodorosCompleted = 0
         timer?.invalidate()
         timer = nil
         updateDerived()
     }
 
     // MARK: - Private
+
+    private func startPhase() {
+        let endTime = Date.now.timeIntervalSince1970 + phaseDuration
+        UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        flushDefaults()
+        tick()
+        startTimer()
+    }
+
+    private func advancePhase() {
+        timer?.invalidate()
+        timer = nil
+
+        switch phase {
+        case .work:
+            pomodorosCompleted += 1
+            if pomodorosCompleted >= TimerModel.pomodorosPerCycle {
+                phase = .longBreak
+            } else {
+                phase = .shortBreak
+            }
+        case .shortBreak:
+            phase = .work
+        case .longBreak:
+            phase = .work
+            pomodorosCompleted = 0
+        }
+
+        persistPhaseState()
+        startPhase()
+    }
+
+    private func persistPhaseState() {
+        UserDefaults.standard.set(phase.rawValue, forKey: DefaultsKey.phase)
+        UserDefaults.standard.set(pomodorosCompleted, forKey: DefaultsKey.pomodorosCompleted)
+        flushDefaults()
+    }
 
     private func updateDerived() {
         if let seconds = secondsLeft, seconds > 0 {
@@ -151,7 +219,7 @@ final class TimerModel {
             secondsLeft = remaining
             updateDerived()
         } else {
-            stop()
+            advancePhase()
         }
     }
 }

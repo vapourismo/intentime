@@ -4,7 +4,7 @@ This file is the source of truth for project conventions and context. **Any chan
 
 ## Project Overview
 
-Focus Bar — a 25-minute focus timer that lives in the macOS menu bar. Native Swift app using AppKit's `NSStatusItem`.
+Focus Bar — a Pomodoro timer that lives in the macOS menu bar. Cycles through 25-minute work sessions and breaks (5-minute short breaks, 20-minute long break after every 4 pomodoros). Native Swift app using AppKit's `NSStatusItem`.
 
 ## Development Environment
 
@@ -27,7 +27,7 @@ Focus Bar — a 25-minute focus timer that lives in the macOS menu bar. Native S
 Package.swift                  # SwiftPM manifest
 Sources/FocusBar/
   FocusBarApp.swift            # @main entry point, AppDelegate with NSStatusItem + NSMenu
-  TimerModel.swift             # ObservableObject managing countdown + persistence
+  TimerModel.swift             # Pomodoro state machine managing phases, countdown + persistence
 ```
 
 ## Tech Stack
@@ -47,14 +47,14 @@ Sources/FocusBar/
 - SwiftPM executable target (no Xcode project needed)
 - AppKit `NSStatusItem` + `NSMenu` for menu bar presence (SwiftUI `MenuBarExtra` label does not reliably update from `ObservableObject` state changes)
 - Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
-- Timer state lives in `TimerModel` (`ObservableObject`); the `AppDelegate` uses a 0.5s `Timer` scheduled in `.common` RunLoop mode to poll the model and update the `NSStatusItem` button title/image — this fires even during `NSMenu` event tracking. The menu is rebuilt on demand via `NSMenuDelegate.menuNeedsUpdate(_:)`
+- Timer state lives in `TimerModel`; the `AppDelegate` uses a 0.5s `Timer` scheduled in `.common` RunLoop mode to poll the model and update the `NSStatusItem` button title/image — this fires even during `NSMenu` event tracking. The menu is rebuilt on demand via `NSMenuDelegate.menuNeedsUpdate(_:)`
+- Pomodoro cycle: work (25 min) → short break (5 min) → repeat; after 4 work sessions → long break (20 min) → cycle restarts. `TimerModel` auto-advances phases when a timer expires. Current phase and pomodoro count are persisted in `UserDefaults`
 - Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick. Paused state is persisted as `pausedSecondsLeft` (integer) — on pause the end time is cleared and remaining seconds saved; on unpause a new end time is computed
-- 1-second timer via `Timer.publish(every: 1, on: .main, in: .common)` — fires even when menu is open
 - Timer and message are independent: the timer can be started/stopped without setting a message, and a message can be set/cleared without a running timer
 - Message is persisted in `UserDefaults` and restored on launch (independent of timer state)
-- Timer is NOT auto-restored on launch; instead, a "Continue Previous Timer" menu item appears when a previous session is still valid, letting the user choose to resume
-- Timer can be paused and resumed; paused state survives app restart via `UserDefaults`
-- Menu bar title shows `MM:SS — message` (both active), `MM:SS` (timer only), or `message` (message only); icon only when both are inactive. When the timer is active, the icon is a custom-drawn progress circle (pie chart filling clockwise from 12 o'clock) rendered via Core Graphics as a template image. When paused, the icon changes to `pause.fill`
+- Timer is NOT auto-restored on launch; instead, a "Continue Previous Session" menu item appears when a previous session is still valid, letting the user choose to resume
+- Timer can be paused and resumed during work phases; paused state survives app restart via `UserDefaults`. Users can skip any phase (skip to break or skip break)
+- Menu bar title shows `MM:SS — message` (timer with message), `MM:SS` (timer only), or `message` (message only); icon only when idle. During work, the icon is a custom-drawn progress circle (pie chart filling clockwise from 12 o'clock). During breaks, the icon is `cup.and.saucer.fill`. When paused, the icon changes to `pause.fill`
 
 ## Gotchas
 
