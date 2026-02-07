@@ -312,8 +312,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     /// Skip the current phase (work → break or break → work).
     @objc private func skipPhase() {
-        dismissBlurOverlay()
+        let wasBreak = timer.phase == .shortBreak || timer.phase == .longBreak
+        if wasBreak {
+            dismissBlurOverlay()
+        }
         timer.skip()
+        let isBreak = timer.phase == .shortBreak || timer.phase == .longBreak
+        if isBreak {
+            showBlurOverlay()
+        }
         updateButton()
     }
 
