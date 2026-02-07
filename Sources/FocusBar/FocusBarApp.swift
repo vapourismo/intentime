@@ -22,6 +22,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        timer.onPhaseChange = { [weak self] phase in
+            self?.showBreakBanner(for: phase)
+        }
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         let menu = NSMenu()
@@ -254,6 +258,66 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     @objc private func clearMessage() {
         timer.message = nil
         updateButton()
+    }
+
+    private func showBreakBanner(for phase: TimerModel.Phase) {
+        guard phase == .shortBreak || phase == .longBreak else { return }
+        let title = phase == .longBreak ? "Long Break" : "Short Break"
+        let body = phase == .longBreak
+            ? "Great work! Take a 20-minute break."
+            : "Take a 5-minute break."
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 64),
+            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel, .hudWindow],
+            backing: .buffered, defer: false)
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
+        panel.titleVisibility = .hidden
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 2
+        stack.edgeInsets = NSEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+
+        let titleField = NSTextField(labelWithString: title)
+        titleField.font = .boldSystemFont(ofSize: 14)
+        let bodyField = NSTextField(labelWithString: body)
+        bodyField.font = .systemFont(ofSize: 12)
+        bodyField.textColor = .secondaryLabelColor
+
+        stack.addArrangedSubview(titleField)
+        stack.addArrangedSubview(bodyField)
+        panel.contentView = stack
+
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        let panelSize = panel.frame.size
+        let origin = NSPoint(
+            x: screenFrame.maxX - panelSize.width - 16,
+            y: screenFrame.maxY - panelSize.height - 16)
+        panel.setFrameOrigin(origin)
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.3
+            panel.animator().alphaValue = 1
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.5
+                panel.animator().alphaValue = 0
+            }, completionHandler: {
+                panel.close()
+            })
+        }
+
+        NSSound.beep()
     }
 
     @objc private func quit() {

@@ -14,6 +14,9 @@ final class TimerModel {
     private(set) var phase: Phase = .work
     private(set) var pomodorosCompleted: Int = 0
 
+    /// Called when the phase changes automatically (not on start/stop/skip).
+    var onPhaseChange: ((Phase) -> Void)?
+
     static let pomodorosPerCycle = 4
 
     var message: String? {
@@ -153,6 +156,7 @@ final class TimerModel {
         }
 
         persistPhaseState()
+        onPhaseChange?(phase)
         startPhase()
     }
 
