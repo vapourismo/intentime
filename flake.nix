@@ -16,10 +16,12 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
-        devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
-            nodejs_22
-          ];
+        devShells.default = pkgs.mkShellNoCC {
+          packages = [ ];
+          # Use Xcode's SDK and toolchain for Swift builds.
+          shellHook = ''
+            unset SDKROOT DEVELOPER_DIR NIX_CFLAGS_COMPILE NIX_LDFLAGS MACOSX_DEPLOYMENT_TARGET
+          '';
         };
       }
     );

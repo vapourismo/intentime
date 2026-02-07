@@ -4,8 +4,12 @@
 # Direnv
 /.direnv
 
-# Node
-node_modules/
+# Swift / SwiftPM
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcodeproj
 
-# Raycast
-dist/
+# macOS
+.DS_Store

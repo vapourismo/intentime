@@ -4,40 +4,38 @@ This file is the source of truth for project conventions and context. **Any chan
 
 ## Project Overview
 
-Raycast menu bar extension ("Focus Bar") — a 25-minute focus timer that lives in the macOS menu bar. Built with React/TypeScript on the Raycast Extension API.
+Focus Bar — a 25-minute focus timer that lives in the macOS menu bar. Native Swift app using SwiftUI's `MenuBarExtra`.
 
 ## Development Environment
 
-- **Runtime:** Node.js 22 (provided by Nix flake)
+- **Language:** Swift (requires Xcode and macOS SDK)
 - Nix flake dev shell with direnv integration (`.envrc` with `use flake`)
 - Nixpkgs unstable channel, multi-system via `flake-utils`
-- **Package manager:** npm (lockfile committed)
+- **Build system:** Swift Package Manager
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start Raycast development server (`ray develop`) |
-| `npm run build` | Build for distribution (`ray build`) |
-| `npm run lint` | Run ESLint |
-| `npm run fix-lint` | Auto-fix lint issues |
+| `swift build` | Build the app |
+| `swift run` | Build and run the menu bar app |
+| `swift build -c release` | Release build |
 
 ## Project Structure
 
 ```
-src/
-  focus-bar.tsx   # Main MenuBarExtra component (single entry point)
-assets/
-  icon.png        # Extension icon
+Package.swift                  # SwiftPM manifest
+Sources/FocusBar/
+  FocusBarApp.swift            # @main App struct with MenuBarExtra scene
+  TimerModel.swift             # ObservableObject managing countdown + persistence
 ```
 
 ## Tech Stack
 
-- **Language:** TypeScript (strict mode, target ES2021, CommonJS modules)
-- **UI:** React JSX via Raycast `MenuBarExtra` component
-- **API:** `@raycast/api`, `@raycast/utils`
-- **Linting:** ESLint with `@raycast/eslint-config`
-- **Formatting:** Prettier
+- **Language:** Swift 5.9+
+- **UI:** SwiftUI `MenuBarExtra` (macOS 14+)
+- **Persistence:** `UserDefaults`
+- **Build:** Swift Package Manager (executable target)
 
 ## Conventions
 
@@ -46,15 +44,19 @@ assets/
 
 ## Architecture Decisions
 
-- Single-file component in `src/focus-bar.tsx` using Raycast's `MenuBarExtra` for menu bar presence
-- Timer uses Raycast `Cache` to persist `endTime` (epoch ms); remaining time is computed on each render
-- Background refresh at 10s interval (minimum allowed by Raycast) keeps the menu bar title updated
+- SwiftPM executable target (no Xcode project needed)
+- SwiftUI `MenuBarExtra` for menu bar presence — deployment target macOS 14
+- Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
+- Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick
+- 1-second timer via `Timer.publish(every: 1, on: .main, in: .common)` — fires even when menu is open
 - Menu bar title shows `MM:SS` while running, hidden when idle (icon only)
-- Raycast handles the build pipeline — no custom bundler config needed
+- `ObservableObject` pattern for timer state (macOS 14 compatible)
 
 ## Gotchas
 
 - Nix files must be staged in git before `nix flake update` will see them
-- Raycast types are auto-generated in `raycast-env.d.ts` — do not edit manually
-- MenuBarExtra commands are **not** long-lived processes — `setInterval`/`setState` won't update the menu bar. Use `Cache` + background refresh (`interval` in package.json) instead
-- Minimum background refresh interval is `10s`; actual timing varies (macOS optimizes for energy)
+- The flake uses `mkShellNoCC` and unsets `SDKROOT`/`DEVELOPER_DIR`/`NIX_CFLAGS_COMPILE`/`NIX_LDFLAGS` in `shellHook` — Nix's default darwin SDK is incompatible with the Xcode Swift toolchain
+- `MenuBarExtra` requires macOS 13+; we target macOS 14 for stable behavior
+- `Timer.publish` must use `.common` RunLoop mode, otherwise the timer pauses when the menu dropdown is open
+- The app is a menu-bar-only app (no main window); `NSApplication.setActivationPolicy(.accessory)` hides the Dock icon
+- A "Quit" menu item is essential since there's no Dock icon to right-click for quitting
