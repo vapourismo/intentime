@@ -24,7 +24,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// Polls `TimerModel` every 0.5 s to refresh the status item button. Runs in `.common` mode
     /// so it fires during `NSMenu` event tracking.
     private var displayTimer: Timer?
-    /// The floating HUD shown when a break ends, prompting the user to continue/extend/stop.
+    /// The floating HUD shown when a break ends, prompting the user to resume/extend/stop.
     private var promptPanel: NSPanel?
     /// The Spotlight-like HUD for entering/editing the focus message.
     private var messagePanel: NSPanel?
@@ -199,7 +199,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             menu.addItem(headerItem)
             menu.addItem(.separator())
 
-            let continueItem = NSMenuItem(title: "Continue Working", action: #selector(continueFromPrompt), keyEquivalent: "")
+            let continueItem = NSMenuItem(title: "Resume Work", action: #selector(continueFromPrompt), keyEquivalent: "")
             continueItem.target = self
             menu.addItem(continueItem)
 
@@ -603,7 +603,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         NSSound.beep()
     }
 
-    /// Show a persistent HUD prompt when a break ends, offering "Continue", "Extend Break", and "Stop".
+    /// Show a persistent HUD prompt when a break ends, offering "Resume Work", "Extend Break", and "Stop".
     ///
     /// The prompt stays visible until the user interacts with one of the buttons.
     private func showBreakEndedPrompt() {
@@ -633,7 +633,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         bodyField.font = .systemFont(ofSize: 12)
         bodyField.textColor = .secondaryLabelColor
 
-        let continueButton = NSButton(title: "Continue", target: self, action: #selector(continueFromPrompt))
+        let continueButton = NSButton(title: "Resume Work", target: self, action: #selector(continueFromPrompt))
         continueButton.bezelStyle = .rounded
         continueButton.keyEquivalent = "\r"
         let extendButton = NSButton(title: "+\(Settings.shared.extendBreakMinutes) min", target: self, action: #selector(extendBreakFromPrompt))
@@ -675,7 +675,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         promptPanel = nil
     }
 
-    /// User chose "Continue" — start the next work session.
+    /// User chose "Resume Work" — start the next work session.
     @objc private func continueFromPrompt() {
         dismissPromptPanel()
         dismissBlurOverlay()
