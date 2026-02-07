@@ -11,11 +11,15 @@ final class TimerModel {
     private(set) var formattedTime: String?
     private(set) var isRunning = false
     private(set) var isPaused = false
+    private(set) var isWaitingToStart = false
     private(set) var phase: Phase = .work
     private(set) var pomodorosCompleted: Int = 0
 
     /// Called when the phase advances automatically (not on manual skip).
     var onAutoPhaseChange: ((Phase) -> Void)?
+
+    /// Called when a break ends and the model is waiting for user confirmation to start work.
+    var onBreakEnded: (() -> Void)?
 
     static let pomodorosPerCycle = 4
 
@@ -117,6 +121,7 @@ final class TimerModel {
         UserDefaults.standard.removeObject(forKey: DefaultsKey.pomodorosCompleted)
         flushDefaults()
         isPaused = false
+        isWaitingToStart = false
         secondsLeft = nil
         phase = .work
         pomodorosCompleted = 0
@@ -136,9 +141,27 @@ final class TimerModel {
         startTimer()
     }
 
+    /// Start the next work phase. Called by the UI after the user confirms.
+    func startNextWork() {
+        guard isWaitingToStart else { return }
+        isWaitingToStart = false
+        startPhase()
+    }
+
+    /// Extend the break by starting a short break phase from the waiting state.
+    func extendBreak() {
+        guard isWaitingToStart else { return }
+        isWaitingToStart = false
+        phase = .shortBreak
+        persistPhaseState()
+        startPhase()
+    }
+
     private func advancePhase(notify: Bool = true) {
         timer?.invalidate()
         timer = nil
+
+        let wasBreak = phase == .shortBreak || phase == .longBreak
 
         switch phase {
         case .work:
@@ -156,6 +179,17 @@ final class TimerModel {
         }
 
         persistPhaseState()
+
+        if wasBreak && notify {
+            // Break ended — wait for user confirmation before starting work.
+            secondsLeft = nil
+            isRunning = false
+            isWaitingToStart = true
+            updateDerived()
+            onBreakEnded?()
+            return
+        }
+
         if notify {
             onAutoPhaseChange?(phase)
         }

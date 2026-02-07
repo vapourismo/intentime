@@ -15,6 +15,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var statusItem: NSStatusItem!
     private let timer = TimerModel()
     private var displayTimer: Timer?
+    private var promptPanel: NSPanel?
 
     func applicationWillTerminate(_ notification: Notification) {
         // Ensure timer state is flushed to disk before exit.
@@ -24,6 +25,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     func applicationDidFinishLaunching(_ notification: Notification) {
         timer.onAutoPhaseChange = { [weak self] phase in
             self?.showPhaseBanner(for: phase)
+        }
+        timer.onBreakEnded = { [weak self] in
+            self?.showBreakEndedPrompt()
         }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -49,7 +53,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let hasTimer = timer.formattedTime != nil
         let hasMessage = timer.message != nil
 
-        if hasTimer || hasMessage {
+        if timer.isWaitingToStart {
+            button.image = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: "Break Over")
+            if let message = timer.message {
+                let regularFont = NSFont.menuBarFont(ofSize: 0)
+                let attributed = NSMutableAttributedString(string: " ")
+                attributed.append(NSAttributedString(
+                    string: message,
+                    attributes: [.font: regularFont]))
+                button.attributedTitle = attributed
+                button.imagePosition = .imageLeading
+            } else {
+                button.title = ""
+                button.imagePosition = .imageOnly
+            }
+        } else if hasTimer || hasMessage {
             if timer.isPaused {
                 button.image = NSImage(systemSymbolName: "pause.fill", accessibilityDescription: "Pomodoro Timer")
             } else if timer.phase == .work, let seconds = timer.secondsLeft {
@@ -142,7 +160,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
 
         // Timer section
-        if timer.isRunning {
+        if timer.isWaitingToStart {
+            let headerItem = NSMenuItem(title: "Break's Over", action: nil, keyEquivalent: "")
+            headerItem.isEnabled = false
+            menu.addItem(headerItem)
+            menu.addItem(.separator())
+
+            let continueItem = NSMenuItem(title: "Continue Working", action: #selector(continueFromPrompt), keyEquivalent: "")
+            continueItem.target = self
+            menu.addItem(continueItem)
+
+            let extendItem = NSMenuItem(title: "Extend Break (+5 min)", action: #selector(extendBreakFromPrompt), keyEquivalent: "")
+            extendItem.target = self
+            menu.addItem(extendItem)
+
+            let stopItem = NSMenuItem(title: "Stop", action: #selector(stopFromPrompt), keyEquivalent: "")
+            stopItem.target = self
+            menu.addItem(stopItem)
+        } else if timer.isRunning {
             if timer.phase == .work {
                 let pauseItem = NSMenuItem(title: "Pause", action: #selector(pauseTimer), keyEquivalent: "")
                 pauseItem.target = self
@@ -261,19 +296,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     private func showPhaseBanner(for phase: TimerModel.Phase) {
-        let title: String
-        let body: String
-        switch phase {
-        case .work:
-            title = "Back to Work"
-            body = "Break's over — time to focus!"
-        case .shortBreak:
-            title = "Short Break"
-            body = "Take a 5-minute break."
-        case .longBreak:
-            title = "Long Break"
-            body = "Great work! Take a 20-minute break."
-        }
+        guard phase == .shortBreak || phase == .longBreak else { return }
+        let title = phase == .longBreak ? "Long Break" : "Short Break"
+        let body = phase == .longBreak
+            ? "Great work! Take a 20-minute break."
+            : "Take a 5-minute break."
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 64),
@@ -326,6 +353,90 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
 
         NSSound.beep()
+    }
+
+    private func showBreakEndedPrompt() {
+        dismissPromptPanel()
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 88),
+            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel, .hudWindow],
+            backing: .buffered, defer: false)
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
+        panel.titleVisibility = .hidden
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+
+        let titleField = NSTextField(labelWithString: "Break's Over")
+        titleField.font = .boldSystemFont(ofSize: 14)
+        let bodyField = NSTextField(labelWithString: "Ready to start the next work session?")
+        bodyField.font = .systemFont(ofSize: 12)
+        bodyField.textColor = .secondaryLabelColor
+
+        let continueButton = NSButton(title: "Continue", target: self, action: #selector(continueFromPrompt))
+        continueButton.bezelStyle = .rounded
+        continueButton.keyEquivalent = "\r"
+        let extendButton = NSButton(title: "+5 min", target: self, action: #selector(extendBreakFromPrompt))
+        extendButton.bezelStyle = .rounded
+        let stopButton = NSButton(title: "Stop", target: self, action: #selector(stopFromPrompt))
+        stopButton.bezelStyle = .rounded
+
+        let buttonStack = NSStackView(views: [continueButton, extendButton, stopButton])
+        buttonStack.orientation = .horizontal
+        buttonStack.spacing = 8
+
+        stack.addArrangedSubview(titleField)
+        stack.addArrangedSubview(bodyField)
+        stack.addArrangedSubview(buttonStack)
+        panel.contentView = stack
+
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        let panelSize = panel.frame.size
+        let origin = NSPoint(
+            x: screenFrame.maxX - panelSize.width - 16,
+            y: screenFrame.maxY - panelSize.height - 16)
+        panel.setFrameOrigin(origin)
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.3
+            panel.animator().alphaValue = 1
+        }
+
+        promptPanel = panel
+        NSSound.beep()
+    }
+
+    private func dismissPromptPanel() {
+        promptPanel?.close()
+        promptPanel = nil
+    }
+
+    @objc private func continueFromPrompt() {
+        dismissPromptPanel()
+        timer.startNextWork()
+        updateButton()
+    }
+
+    @objc private func extendBreakFromPrompt() {
+        dismissPromptPanel()
+        timer.extendBreak()
+        updateButton()
+    }
+
+    @objc private func stopFromPrompt() {
+        dismissPromptPanel()
+        timer.stop()
+        updateButton()
     }
 
     @objc private func quit() {
