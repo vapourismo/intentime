@@ -18,7 +18,7 @@
       {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            # Add dev dependencies here
+            nodejs_22
           ];
         };
       }

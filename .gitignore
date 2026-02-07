@@ -3,3 +3,9 @@
 
 # Direnv
 /.direnv
+
+# Node
+node_modules/
+
+# Raycast
+dist/
