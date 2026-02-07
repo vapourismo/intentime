@@ -54,14 +54,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else {
                 button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
             }
-            var parts: [String] = []
+            var parts: [(String, NSFont)] = []
+            let monoDigitFont = NSFont.monospacedDigitSystemFont(
+                ofSize: NSFont.systemFontSize, weight: .regular)
+            let regularFont = NSFont.menuBarFont(ofSize: 0)
             if let time = timer.formattedTime {
-                parts.append(time)
+                parts.append((time, monoDigitFont))
             }
             if let message = timer.message {
-                parts.append(message)
+                parts.append((message, regularFont))
             }
-            button.title = " " + parts.joined(separator: " — ")
+            let attributed = NSMutableAttributedString(string: " ")
+            for (index, part) in parts.enumerated() {
+                if index > 0 {
+                    attributed.append(NSAttributedString(string: " — "))
+                }
+                attributed.append(NSAttributedString(
+                    string: part.0,
+                    attributes: [.font: part.1]))
+            }
+            button.attributedTitle = attributed
             button.imagePosition = .imageLeading
         } else {
             button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Focus Timer")
