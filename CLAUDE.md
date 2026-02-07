@@ -27,6 +27,7 @@ Focus Bar — a Pomodoro timer that lives in the macOS menu bar. Cycles through 
 Package.swift                  # SwiftPM manifest
 Sources/FocusBar/
   FocusBarApp.swift            # @main entry point, AppDelegate with NSStatusItem + NSMenu
+  GlobalHotKey.swift           # Carbon RegisterEventHotKey wrapper for system-wide shortcuts
   TimerModel.swift             # Pomodoro state machine managing phases, countdown + persistence
   Settings.swift               # Singleton holding user-configurable durations, persisted in UserDefaults
 ```
@@ -58,6 +59,7 @@ Sources/FocusBar/
 - Timer is NOT auto-restored on launch; instead, a "Continue Previous Session" menu item appears when a previous session is still valid, letting the user choose to resume
 - Timer can be paused and resumed during work phases; paused state survives app restart via `UserDefaults`. Users can skip any phase (skip to break or skip break)
 - Menu bar title shows `MM:SS — message` (timer with message), `MM:SS` (timer only), or `message` (message only); icon only when idle. During work, the icon is a custom-drawn progress circle (pie chart filling clockwise from 12 o'clock). During breaks, the icon is `cup.and.saucer.fill`. When paused, the icon changes to `pause.fill`
+- System-wide hotkey (⌘⇧Space) opens a Spotlight-like HUD panel for setting the focus message. Uses Carbon `RegisterEventHotKey` (no Accessibility permissions needed, works without a bundle identifier). The same panel is used by the "Set Message…" / "Edit Message…" menu item. Enter confirms, Escape cancels, pressing the hotkey again toggles the panel closed
 
 ## Gotchas
 

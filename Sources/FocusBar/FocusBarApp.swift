@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 
 @main
 enum FocusBarApp {
@@ -16,6 +17,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private let timer = TimerModel()
     private var displayTimer: Timer?
     private var promptPanel: NSPanel?
+    private var messagePanel: NSPanel?
+    private var globalHotKey: GlobalHotKey?
 
     func applicationWillTerminate(_ notification: Notification) {
         // Ensure timer state is flushed to disk before exit.
@@ -45,6 +48,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             self?.updateButton()
         }
         RunLoop.main.add(displayTimer!, forMode: .common)
+
+        // System-wide hotkey: Cmd+Shift+Space to set/edit the focus message.
+        globalHotKey = GlobalHotKey(
+            keyCode: UInt32(kVK_Space),
+            modifiers: UInt32(cmdKey | shiftKey)
+        ) { [weak self] in
+            self?.showMessageInput()
+        }
     }
 
     private func updateButton() {
@@ -274,25 +285,85 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     @objc private func editMessage() {
-        let alert = NSAlert()
-        alert.messageText = "Focus Message"
-        alert.informativeText = "What are you focusing on?"
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
+        showMessageInput()
+    }
 
-        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        input.placeholderString = "e.g. Write blog post"
-        input.stringValue = timer.message ?? ""
-        alert.accessoryView = input
-        alert.window.initialFirstResponder = input
-
-        NSApp.activate(ignoringOtherApps: true)
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            let text = input.stringValue
-            timer.message = text.isEmpty ? nil : text
-            updateButton()
+    private func showMessageInput() {
+        if let existing = messagePanel, existing.isVisible {
+            dismissMessagePanel()
+            return
         }
+
+        let panelWidth: CGFloat = 400
+        let panelHeight: CGFloat = 48
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight),
+            styleMask: [.titled, .fullSizeContentView, .hudWindow, .nonactivatingPanel],
+            backing: .buffered, defer: false)
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .hidden
+        panel.isMovableByWindowBackground = true
+
+        let textField = MessageTextField(frame: .zero)
+        textField.placeholderString = "What are you focusing on?"
+        textField.font = .systemFont(ofSize: 18)
+        textField.isBezeled = false
+        textField.drawsBackground = false
+        textField.focusRingType = .none
+        textField.stringValue = timer.message ?? ""
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        textField.target = self
+        textField.action = #selector(messageFieldSubmitted(_:))
+        textField.onEscape = { [weak self] in self?.dismissMessagePanel() }
+
+        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight))
+        contentView.addSubview(textField)
+        NSLayoutConstraint.activate([
+            textField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            textField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            textField.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+        ])
+        panel.contentView = contentView
+
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        let origin = NSPoint(
+            x: screenFrame.midX - panelWidth / 2,
+            y: screenFrame.midY + screenFrame.height * 0.15)
+        panel.setFrameOrigin(origin)
+
+        panel.alphaValue = 0
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeFirstResponder(textField)
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.15
+            panel.animator().alphaValue = 1
+        }
+
+        messagePanel = panel
+    }
+
+    @objc private func messageFieldSubmitted(_ sender: NSTextField) {
+        let text = sender.stringValue.trimmingCharacters(in: .whitespaces)
+        timer.message = text.isEmpty ? nil : text
+        updateButton()
+        dismissMessagePanel()
+    }
+
+    private func dismissMessagePanel() {
+        guard let panel = messagePanel else { return }
+        messagePanel = nil
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.15
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            panel.close()
+        })
     }
 
     @objc private func clearMessage() {
@@ -607,6 +678,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+}
+
+// MARK: - Message text field (Escape handling)
+
+private final class MessageTextField: NSTextField {
+    var onEscape: (() -> Void)?
+
+    override func cancelOperation(_ sender: Any?) {
+        onEscape?()
     }
 }
 
