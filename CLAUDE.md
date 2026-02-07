@@ -47,7 +47,7 @@ Sources/FocusBar/
 - SwiftPM executable target (no Xcode project needed)
 - AppKit `NSStatusItem` + `NSMenu` for menu bar presence (SwiftUI `MenuBarExtra` label does not reliably update from `ObservableObject` state changes)
 - Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
-- Timer state lives in `TimerModel` (`ObservableObject`); the `AppDelegate` subscribes to `objectWillChange` and rebuilds the `NSStatusItem` button title and `NSMenu` on each change
+- Timer state lives in `TimerModel` (`ObservableObject`); the `AppDelegate` uses a 0.5s `Timer` scheduled in `.common` RunLoop mode to poll the model and update the `NSStatusItem` button title/image — this fires even during `NSMenu` event tracking. The menu is rebuilt on demand via `NSMenuDelegate.menuNeedsUpdate(_:)`
 - Timer uses `UserDefaults` to persist `endTime` (epoch seconds); remaining time is computed on each tick. Paused state is persisted as `pausedSecondsLeft` (integer) — on pause the end time is cleared and remaining seconds saved; on unpause a new end time is computed
 - 1-second timer via `Timer.publish(every: 1, on: .main, in: .common)` — fires even when menu is open
 - Timer and message are independent: the timer can be started/stopped without setting a message, and a message can be set/cleared without a running timer

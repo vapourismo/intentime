@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 
 @main
 enum FocusBarApp {
@@ -12,26 +11,30 @@ enum FocusBarApp {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let timer = TimerModel()
-    private var cancellables: Set<AnyCancellable> = []
+    private var displayTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        updateStatusItem()
 
-        timer.objectWillChange
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateStatusItem()
-                }
-            }
-            .store(in: &cancellables)
+        let menu = NSMenu()
+        menu.delegate = self
+        statusItem.menu = menu
+
+        updateButton()
+
+        // Use a plain Timer in .common mode so it fires even during menu tracking.
+        // Combine's receive(on:)/DispatchQueue.main.async don't deliver while
+        // NSMenu's event-tracking run loop is active.
+        displayTimer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.updateButton()
+        }
+        RunLoop.main.add(displayTimer!, forMode: .common)
     }
 
-    private func updateStatusItem() {
+    private func updateButton() {
         guard let button = statusItem.button else { return }
 
         let hasTimer = timer.formattedTime != nil
@@ -54,8 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.title = ""
             button.imagePosition = .imageOnly
         }
+    }
 
-        let menu = NSMenu()
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
 
         // Timer section
         if timer.isRunning {
@@ -107,7 +112,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
-        statusItem.menu = menu
     }
 
     @objc private func startTimer() {
