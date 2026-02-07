@@ -8,6 +8,10 @@ This file is the source of truth for project conventions and context. Keep it up
 - Nixpkgs unstable channel, multi-system via `flake-utils`
 - Nix files must be staged in git before `nix flake update` will see them
 
+## Conventions
+
+- Commits use [Conventional Commits](https://www.conventionalcommits.org/) format: `type: description`
+
 ## Architecture Decisions
 
 <!-- Record significant design choices and their rationale here -->
