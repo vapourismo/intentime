@@ -22,7 +22,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        timer.onPhaseChange = { [weak self] phase in
+        timer.onAutoPhaseChange = { [weak self] phase in
             self?.showBreakBanner(for: phase)
         }
 

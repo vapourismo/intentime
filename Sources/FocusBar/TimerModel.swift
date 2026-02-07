@@ -14,8 +14,8 @@ final class TimerModel {
     private(set) var phase: Phase = .work
     private(set) var pomodorosCompleted: Int = 0
 
-    /// Called when the phase changes automatically (not on start/stop/skip).
-    var onPhaseChange: ((Phase) -> Void)?
+    /// Called when the phase advances automatically (not on manual skip).
+    var onAutoPhaseChange: ((Phase) -> Void)?
 
     static let pomodorosPerCycle = 4
 
@@ -85,7 +85,7 @@ final class TimerModel {
     }
 
     func skip() {
-        advancePhase()
+        advancePhase(notify: false)
     }
 
     func pause() {
@@ -136,7 +136,7 @@ final class TimerModel {
         startTimer()
     }
 
-    private func advancePhase() {
+    private func advancePhase(notify: Bool = true) {
         timer?.invalidate()
         timer = nil
 
@@ -156,7 +156,9 @@ final class TimerModel {
         }
 
         persistPhaseState()
-        onPhaseChange?(phase)
+        if notify {
+            onAutoPhaseChange?(phase)
+        }
         startPhase()
     }
 
