@@ -658,8 +658,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.5
-                // Reduce overall effect strength so more of the screen remains visible.
-                window.animator().alphaValue = 0.7
+                // Keep the blur prominent while still allowing context to remain visible.
+                window.animator().alphaValue = 0.85
             }
         }
     }
