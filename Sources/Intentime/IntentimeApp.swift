@@ -578,10 +578,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     /// Flash an orange glow along the borders of all screens to signal a break starting.
     ///
-    /// The glow fades out over 2 seconds after a 0.3 s hold. Uses `BorderFlashView` for the gradient.
+    /// The glow lasts 15 seconds total (including a 0.5 s hold) using `BorderFlashView` for the gradient.
     private func flashScreenBorder() {
         let glowWidth: CGFloat = 40
         let color = NSColor.systemOrange
+        let holdDuration: TimeInterval = 0.5
+        let totalDuration: TimeInterval = 15.0
+        let fadeDuration = max(0, totalDuration - holdDuration)
 
         for screen in NSScreen.screens {
             let frame = screen.frame
@@ -605,9 +608,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             window.orderFrontRegardless()
             self.flashWindows.append(window)
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + holdDuration) { [weak self] in
                 NSAnimationContext.runAnimationGroup({ ctx in
-                    ctx.duration = 2.0
+                    ctx.duration = fadeDuration
                     window.animator().alphaValue = 0
                 }, completionHandler: { [weak self] in
                     window.close()
