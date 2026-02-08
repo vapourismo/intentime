@@ -33,6 +33,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// Cached break status copy so it stays stable during a single active break.
     private var breakStatusPhase: TimerModel.Phase?
     private var breakStatusText: String?
+    /// Cached app logo image used as the default/idle status-item icon.
+    private lazy var appLogoStatusImage: NSImage? = loadAppLogoStatusImage()
 
     func applicationWillTerminate(_ notification: Notification) {
         // Ensure timer state is flushed to disk before exit.
@@ -76,7 +78,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     ///
     /// Title format: `MM:SS — message` (timer with message), `MM:SS — break encouragement`
     /// (active short/long breaks), `MM:SS` (timer only), or `message` (message only).
-    /// Icon: progress pie during work, cup during break, pause symbol when paused, clock when idle.
+    /// Icon: progress pie during work, cup during break, pause symbol when paused, app logo when idle.
     private func updateButton() {
         guard let button = statusItem.button else { return }
 
@@ -111,7 +113,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             } else if timer.isRunning, (timer.phase == .shortBreak || timer.phase == .longBreak) {
                 button.image = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: "Break")
             } else {
-                button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Pomodoro Timer")
+                button.image = defaultStatusImage()
             }
             var parts: [(text: String, font: NSFont)] = []
             let monoDigitFont = NSFont.monospacedDigitSystemFont(
@@ -137,10 +139,91 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             button.attributedTitle = attributed
             button.imagePosition = .imageLeading
         } else {
-            button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Pomodoro Timer")
+            button.image = defaultStatusImage()
             button.title = ""
             button.imagePosition = .imageOnly
         }
+    }
+
+    private func defaultStatusImage() -> NSImage? {
+        appLogoStatusImage
+            ?? NSImage(systemSymbolName: "clock", accessibilityDescription: "Pomodoro Timer")
+    }
+
+    private func loadAppLogoStatusImage() -> NSImage? {
+        let candidates: [NSImage?] = [
+            NSImage(named: "AppIcon"),
+            Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)),
+            NSImage(contentsOf: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent("Resources")
+                .appendingPathComponent("AppIcon.icns"))
+        ]
+
+        guard let image = candidates.compactMap({ $0 }).first else { return nil }
+        let trimmed = trimmedTransparentPadding(from: image) ?? image
+        trimmed.size = NSSize(width: 18, height: 18)
+        trimmed.isTemplate = false
+        return trimmed
+    }
+
+    /// Trims fully-transparent border pixels so the visible mark fills status-bar icon bounds.
+    private func trimmedTransparentPadding(from image: NSImage) -> NSImage? {
+        guard
+            let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+            let dataProvider = cgImage.dataProvider,
+            let data = dataProvider.data
+        else {
+            return nil
+        }
+
+        let ptr = CFDataGetBytePtr(data)
+        guard let bytes = ptr else { return nil }
+
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = cgImage.bitsPerPixel / 8
+        let bytesPerRow = cgImage.bytesPerRow
+        guard bytesPerPixel >= 4 else { return nil }
+
+        var minX = width
+        var minY = height
+        var maxX = -1
+        var maxY = -1
+
+        // Determine alpha byte offset based on bitmap info.
+        let alphaInfo = cgImage.alphaInfo
+        let alphaOffset: Int
+        switch alphaInfo {
+        case .premultipliedFirst, .first, .noneSkipFirst:
+            alphaOffset = 0
+        case .premultipliedLast, .last, .noneSkipLast:
+            alphaOffset = bytesPerPixel - 1
+        default:
+            return nil
+        }
+
+        for y in 0..<height {
+            for x in 0..<width {
+                let idx = y * bytesPerRow + x * bytesPerPixel + alphaOffset
+                if bytes[idx] > 0 {
+                    minX = min(minX, x)
+                    minY = min(minY, y)
+                    maxX = max(maxX, x)
+                    maxY = max(maxY, y)
+                }
+            }
+        }
+
+        guard maxX >= minX, maxY >= minY else { return nil }
+
+        let cropRect = CGRect(
+            x: minX,
+            y: minY,
+            width: maxX - minX + 1,
+            height: maxY - minY + 1
+        )
+        guard let cropped = cgImage.cropping(to: cropRect) else { return nil }
+        return NSImage(cgImage: cropped, size: NSSize(width: cropped.width, height: cropped.height))
     }
 
     private func breakEncouragementText(for phase: TimerModel.Phase) -> String {
