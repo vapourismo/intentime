@@ -75,6 +75,15 @@ ctx.setShouldAntialias(true)
 ctx.setAllowsAntialiasing(true)
 ctx.clear(CGRect(origin: .zero, size: canvasSize))
 
+// Scale the full artwork up so the generated app icon has less transparent padding.
+let iconScale: CGFloat = 1.58
+let canvasCenter = CGPoint(x: canvasSize.width / 2.0, y: canvasSize.height / 2.0)
+ctx.saveGState()
+ctx.translateBy(x: canvasCenter.x, y: canvasCenter.y)
+ctx.scaleBy(x: iconScale, y: iconScale)
+ctx.translateBy(x: -canvasCenter.x, y: -canvasCenter.y)
+defer { ctx.restoreGState() }
+
 let center = CGPoint(x: canvasSize.width / 2.0, y: canvasSize.height / 2.0 + 16.0)
 let ringRadius: CGFloat = 255.0
 let ringThickness: CGFloat = 76.0
