@@ -57,6 +57,19 @@
           default = self.packages.${system}.intentime;
         };
 
+        apps = {
+          intentime = {
+            type = "app";
+            program = toString (
+              pkgs.writeShellScript "launch-intentime" ''
+                open -a "${self.packages.${system}.intentime}/Applications/Intentime.app"
+              ''
+            );
+          };
+
+          default = self.apps.${system}.intentime;
+        };
+
         devShells.default = pkgs.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
         };

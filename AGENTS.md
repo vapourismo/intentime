@@ -21,6 +21,7 @@ Intentime - a Pomodoro timer that lives in the macOS menu bar. Cycles through wo
 | `swift run` | Build and run the menu bar app |
 | `swift build -c release` | Release build |
 | `nix build --no-link .#` | Build the flake package (installs `bin/intentime` and `Applications/Intentime.app`) |
+| `nix run .#` | Launch the flake app via `open -a` on `Applications/Intentime.app` |
 | `./scripts/generate-icon.sh` | Render template logo + generate `Resources/AppIcon.icns` |
 | `./scripts/bundle.sh` | Build release + assemble `build/Intentime.app` bundle |
 | `./scripts/bundle.sh --sign` | Build release + bundle + ad-hoc codesign |
@@ -62,7 +63,7 @@ build/                         # Bundle output (gitignored)
 ## Architecture Decisions
 
 - SwiftPM executable target (no Xcode project needed)
-- Flake exports `packages.intentime` via a sandboxed Nix derivation using `swiftPackages.stdenv.mkDerivation` with `swift` + `swiftpm` in `nativeBuildInputs`; the helper-provided build phase performs a release SwiftPM build and `installPhase` assembles `$out/Applications/Intentime.app` (binary, `Info.plist`, `Resources`, `PkgInfo`) and symlinks `$out/bin/intentime` to the app executable. `packages.default` is defined as `self.packages.${system}.intentime`
+- Flake exports `packages.intentime` via a sandboxed Nix derivation using `swiftPackages.stdenv.mkDerivation` with `swift` + `swiftpm` in `nativeBuildInputs`; the helper-provided build phase performs a release SwiftPM build and `installPhase` assembles `$out/Applications/Intentime.app` (binary, `Info.plist`, `Resources`, `PkgInfo`) and symlinks `$out/bin/intentime` to the app executable. `packages.default` is defined as `self.packages.${system}.intentime`. Flake also exports `apps.intentime`/`apps.default`, which run a tiny launcher script that executes `open -a "$storePath/Applications/Intentime.app"` so `nix run` opens the app bundle instead of invoking the raw executable
 - AppKit `NSStatusItem` + `NSMenu` for menu bar presence (SwiftUI `MenuBarExtra` label does not reliably update from `ObservableObject` state changes)
 - Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
 - Timer state lives in `TimerModel`; the `AppDelegate` uses a 0.5s `Timer` scheduled in `.common` RunLoop mode to poll the model and update the `NSStatusItem` button title/image - this fires even during `NSMenu` event tracking. The menu is rebuilt on demand via `NSMenuDelegate.menuNeedsUpdate(_:)`
