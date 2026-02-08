@@ -30,7 +30,20 @@
 
             installPhase = ''
               runHook preInstall
-              install -Dm755 "$(swiftpmBinPath)/Intentime" "$out/bin/intentime"
+
+              app="$out/Applications/Intentime.app"
+              mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$out/bin"
+
+              install -Dm755 "$(swiftpmBinPath)/Intentime" "$app/Contents/MacOS/Intentime"
+              install -Dm644 Info.plist "$app/Contents/Info.plist"
+
+              if [ -d Resources ]; then
+                cp -R Resources/. "$app/Contents/Resources/"
+              fi
+
+              printf 'APPL????' > "$app/Contents/PkgInfo"
+              ln -s "$app/Contents/MacOS/Intentime" "$out/bin/intentime"
+
               runHook postInstall
             '';
 
