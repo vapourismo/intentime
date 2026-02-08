@@ -54,6 +54,11 @@ cp "$BINARY" "$MACOS_DIR/$APP_NAME"
 # Copy Info.plist
 cp "$PROJECT_DIR/Info.plist" "$CONTENTS_DIR/Info.plist"
 
+# Copy app resources (including AppIcon.icns)
+if [[ -d "$PROJECT_DIR/Resources" ]]; then
+    cp -R "$PROJECT_DIR/Resources/." "$RESOURCES_DIR/"
+fi
+
 # Write PkgInfo
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
 
