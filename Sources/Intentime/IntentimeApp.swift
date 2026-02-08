@@ -784,9 +784,35 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let title = phase == .longBreak ? "Long Break" : "Short Break"
         let minutes = phase == .longBreak ? settings.longBreakMinutes : settings.shortBreakMinutes
         let body = randomBreakBannerBody(for: phase, minutes: minutes)
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+
+        let horizontalPadding: CGFloat = 16
+        let topPadding: CGFloat = 12
+        let bottomPadding: CGFloat = 12
+        let spacing: CGFloat = 2
+        let minPanelWidth: CGFloat = 300
+        let maxPanelWidth: CGFloat = min(460, max(minPanelWidth, screenFrame.width - 32))
+
+        let titleFont = NSFont.boldSystemFont(ofSize: 14)
+        let bodyFont = NSFont.systemFont(ofSize: 12)
+        let maxTextWidth = maxPanelWidth - (horizontalPadding * 2)
+        let titleWidth = ceil((title as NSString).size(withAttributes: [.font: titleFont]).width)
+        let bodySingleLineWidth = ceil((body as NSString).size(withAttributes: [.font: bodyFont]).width)
+        let preferredTextWidth = min(max(titleWidth, bodySingleLineWidth), maxTextWidth)
+        let panelWidth = max(minPanelWidth, preferredTextWidth + (horizontalPadding * 2))
+        let bodyWidth = panelWidth - (horizontalPadding * 2)
+        let bodyBounding = (body as NSString).boundingRect(
+            with: NSSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: bodyFont],
+            context: nil)
+        let titleHeight = ceil(titleFont.ascender - titleFont.descender)
+        let bodyHeight = ceil(max(bodyBounding.height, bodyFont.ascender - bodyFont.descender))
+        let panelHeight = topPadding + titleHeight + spacing + bodyHeight + bottomPadding
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 64),
+            contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight),
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel, .hudWindow],
             backing: .buffered, defer: false)
         panel.isFloatingPanel = true
@@ -797,24 +823,36 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         panel.isMovableByWindowBackground = true
         panel.titleVisibility = .hidden
 
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 2
-        stack.edgeInsets = NSEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
-
         let titleField = NSTextField(labelWithString: title)
-        titleField.font = .boldSystemFont(ofSize: 14)
+        titleField.font = titleFont
+        titleField.frame = NSRect(
+            x: horizontalPadding,
+            y: panelHeight - topPadding - titleHeight,
+            width: bodyWidth,
+            height: titleHeight)
+
         let bodyField = NSTextField(labelWithString: body)
-        bodyField.font = .systemFont(ofSize: 12)
+        bodyField.font = bodyFont
         bodyField.textColor = .secondaryLabelColor
+        bodyField.maximumNumberOfLines = 0
+        bodyField.lineBreakMode = .byWordWrapping
+        bodyField.usesSingleLineMode = false
+        if let cell = bodyField.cell as? NSTextFieldCell {
+            cell.wraps = true
+            cell.usesSingleLineMode = false
+            cell.lineBreakMode = .byWordWrapping
+        }
+        bodyField.frame = NSRect(
+            x: horizontalPadding,
+            y: bottomPadding,
+            width: bodyWidth,
+            height: bodyHeight)
 
-        stack.addArrangedSubview(titleField)
-        stack.addArrangedSubview(bodyField)
-        panel.contentView = stack
+        let contentView = NSView(frame: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight))
+        contentView.addSubview(titleField)
+        contentView.addSubview(bodyField)
+        panel.contentView = contentView
 
-        guard let screen = NSScreen.main else { return }
-        let screenFrame = screen.visibleFrame
         let panelSize = panel.frame.size
         let origin = NSPoint(
             x: screenFrame.maxX - panelSize.width - 16,
