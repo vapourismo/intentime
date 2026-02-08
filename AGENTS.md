@@ -20,6 +20,7 @@ Intentime - a Pomodoro timer that lives in the macOS menu bar. Cycles through wo
 | `swift build` | Build the app |
 | `swift run` | Build and run the menu bar app |
 | `swift build -c release` | Release build |
+| `nix build --no-link .#` | Build the flake package for the app executable |
 | `./scripts/generate-icon.sh` | Render template logo + generate `Resources/AppIcon.icns` |
 | `./scripts/bundle.sh` | Build release + assemble `build/Intentime.app` bundle |
 | `./scripts/bundle.sh --sign` | Build release + bundle + ad-hoc codesign |
@@ -64,6 +65,7 @@ build/                         # Bundle output (gitignored)
 ## Architecture Decisions
 
 - SwiftPM executable target (no Xcode project needed)
+- Flake exports `packages.intentime` via a sandboxed Nix derivation using `swiftPackages.stdenv.mkDerivation` with `swift` + `swiftpm` in `nativeBuildInputs`; the helper-provided build phase performs a release SwiftPM build and `installPhase` installs `Intentime` from `$(swiftpmBinPath)` as `$out/bin/intentime`. `packages.default` is defined as `self.packages.${system}.intentime`
 - AppKit `NSStatusItem` + `NSMenu` for menu bar presence (SwiftUI `MenuBarExtra` label does not reliably update from `ObservableObject` state changes)
 - Dock icon hidden via `NSApplication.setActivationPolicy(.accessory)`
 - Timer state lives in `TimerModel`; the `AppDelegate` uses a 0.5s `Timer` scheduled in `.common` RunLoop mode to poll the model and update the `NSStatusItem` button title/image - this fires even during `NSMenu` event tracking. The menu is rebuilt on demand via `NSMenuDelegate.menuNeedsUpdate(_:)`
