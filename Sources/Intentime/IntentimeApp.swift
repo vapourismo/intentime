@@ -537,6 +537,88 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// Show a temporary HUD banner in the top-right corner announcing a break phase.
     ///
     /// Auto-dismisses after 4 seconds. Only shown for break phases (not work).
+    private func randomBreakBannerBody(for phase: TimerModel.Phase, minutes: Int) -> String {
+        let shortBreakOptions: [(Int) -> String] = [
+            { "Take a \($0)-minute break. Your brain earned a lap." },
+            { "Break time: \($0) minutes. Hydrate like you mean it." },
+            { "Step away for \($0) minutes before the tabs multiply." },
+            { "You get \($0) minutes off. Go look at something non-screen." },
+            { "Pause for \($0) minutes. Shoulders down, jaw unclenched." },
+            { "Take \($0) minutes. Even race cars pit." },
+            { "Quick reset: \($0) minutes. No productivity guilt allowed." },
+            { "Break for \($0) minutes. Your future self approves." },
+            { "A \($0)-minute break just dropped. Claim it." },
+            { "Time for \($0) minutes of not staring intensely." },
+            { "Take \($0) minutes. Water, stretch, tiny dance." },
+            { "Clock says \($0)-minute break. Obey the clock." },
+            { "You are on a \($0)-minute recharge mission." },
+            { "Break window open: \($0) minutes. Touch grass if available." },
+            { "Take \($0) minutes. Brain cache needs clearing." },
+            { "Enjoy \($0) minutes off-screen, or at least off-work." },
+            { "\($0) minutes to reset. No heroic overworking." },
+            { "Break for \($0) minutes. Breathe like you have lungs." },
+            { "\($0)-minute pause. Refuel and come back sharp." },
+            { "Take a \($0)-minute break. You are not a robot." },
+        ]
+
+        let longBreakOptions: [(Int) -> String] = [
+            { "Great work. Take a \($0)-minute long break." },
+            { "Nice streak. Enjoy \($0) minutes fully offline." },
+            { "You earned this: \($0) minutes to recharge." },
+            { "Long break unlocked: \($0) minutes of freedom." },
+            { "Strong focus block. Take \($0) long-break minutes." },
+            { "Respect. \($0) minutes to reset your whole system." },
+            { "Great session. Go enjoy \($0) minutes away." },
+            { "Long break time: \($0) minutes. You earned every second." },
+            { "Pomodoro champion mode. Take \($0) minutes." },
+            { "Deep work complete. \($0)-minute long break incoming." },
+            { "Excellent round. Take \($0) minutes and decompress." },
+            { "Long break for \($0) minutes. Victory sip recommended." },
+            { "You crushed it. \($0) minutes to reboot." },
+            { "Streak maintained. Enjoy a \($0)-minute long break." },
+            { "Great focus. Take \($0) minutes before round two." },
+            { "Long break approved: \($0) minutes, no guilt." },
+            { "That was solid work. Claim your \($0)-minute break." },
+            { "Momentum secured. Recharge for \($0) minutes." },
+            { "Nice execution. Take a \($0)-minute long break." },
+            { "Big focus energy. \($0) minutes off-duty now." },
+        ]
+
+        let options = phase == .longBreak ? longBreakOptions : shortBreakOptions
+        let picker = options.randomElement() ?? { mins in
+            phase == .longBreak
+                ? "Great work! Take a \(mins)-minute break."
+                : "Take a \(mins)-minute break."
+        }
+        return picker(minutes)
+    }
+
+    private func randomBreakEndedPromptBody() -> String {
+        let options = [
+            "Ready for the next focus round?",
+            "Break complete. Want to get back in?",
+            "Shall we start the next work session?",
+            "Recharged enough to dive back in?",
+            "Time to lock in for another round?",
+            "Want to spin up the next focus block?",
+            "Break is done. Ready to roll?",
+            "Back to deep work when you are ready?",
+            "Ready to queue the next pomodoro?",
+            "Want to get the next session moving?",
+            "Feeling reset. Ready for round two?",
+            "Shall we restart mission focus?",
+            "Break ended. Want to resume work?",
+            "Ready to put the brain back in gear?",
+            "Want to kick off the next sprint?",
+            "Good pause. Ready to continue?",
+            "Should we start the next work lap?",
+            "Ready to get back to it?",
+            "Rest complete. Next work block?",
+            "Want to resume and keep momentum?",
+        ]
+        return options.randomElement() ?? "Ready to start the next work session?"
+    }
+
     private func showPhaseBanner(for phase: TimerModel.Phase) {
         guard phase == .shortBreak || phase == .longBreak else { return }
         flashScreenBorder()
@@ -544,9 +626,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let settings = Settings.shared
         let title = phase == .longBreak ? "Long Break" : "Short Break"
         let minutes = phase == .longBreak ? settings.longBreakMinutes : settings.shortBreakMinutes
-        let body = phase == .longBreak
-            ? "Great work! Take a \(minutes)-minute break."
-            : "Take a \(minutes)-minute break."
+        let body = randomBreakBannerBody(for: phase, minutes: minutes)
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 64),
@@ -629,7 +709,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         let titleField = NSTextField(labelWithString: "Break's Over")
         titleField.font = .boldSystemFont(ofSize: 14)
-        let bodyField = NSTextField(labelWithString: "Ready to start the next work session?")
+        let bodyField = NSTextField(labelWithString: randomBreakEndedPromptBody())
         bodyField.font = .systemFont(ofSize: 12)
         bodyField.textColor = .secondaryLabelColor
 
