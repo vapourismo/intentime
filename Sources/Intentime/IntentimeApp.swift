@@ -30,6 +30,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var messagePanel: NSPanel?
     /// System-wide shortcut registration (Cmd+Shift+Space).
     private var globalHotKey: GlobalHotKey?
+    /// Cached break status copy so it stays stable during a single active break.
+    private var breakStatusPhase: TimerModel.Phase?
+    private var breakStatusText: String?
 
     func applicationWillTerminate(_ notification: Notification) {
         // Ensure timer state is flushed to disk before exit.
@@ -71,13 +74,19 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     /// Refresh the status item's icon and title to reflect the current timer/message state.
     ///
-    /// Title format: `MM:SS — message` (both), `MM:SS` (timer only), `message` (message only).
+    /// Title format: `MM:SS — message` (timer with message), `MM:SS — break encouragement`
+    /// (active short/long breaks), `MM:SS` (timer only), or `message` (message only).
     /// Icon: progress pie during work, cup during break, pause symbol when paused, clock when idle.
     private func updateButton() {
         guard let button = statusItem.button else { return }
 
         let hasTimer = timer.formattedTime != nil
         let hasMessage = timer.message != nil
+        let isActiveBreak = timer.isRunning && (timer.phase == .shortBreak || timer.phase == .longBreak)
+        if !isActiveBreak {
+            breakStatusPhase = nil
+            breakStatusText = nil
+        }
 
         if timer.isWaitingToStart {
             button.image = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: "Break Over")
@@ -111,7 +120,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             if let time = timer.formattedTime {
                 parts.append((time, monoDigitFont))
             }
-            if let message = timer.message {
+            if isActiveBreak {
+                parts.append((breakEncouragementText(for: timer.phase), regularFont))
+            } else if let message = timer.message {
                 parts.append((message, regularFont))
             }
             let attributed = NSMutableAttributedString(string: " ")
@@ -129,6 +140,46 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             button.image = NSImage(systemSymbolName: "clock", accessibilityDescription: "Pomodoro Timer")
             button.title = ""
             button.imagePosition = .imageOnly
+        }
+    }
+
+    private func breakEncouragementText(for phase: TimerModel.Phase) -> String {
+        if breakStatusPhase != phase || breakStatusText == nil {
+            breakStatusPhase = phase
+            breakStatusText = randomBreakEncouragementText(for: phase)
+        }
+        return breakStatusText ?? randomBreakEncouragementText(for: phase)
+    }
+
+    private func randomBreakEncouragementText(for phase: TimerModel.Phase) -> String {
+        let shortBreakOptions = [
+            "Stand up and reset",
+            "Breathe and unclench",
+            "Quick pause. Eyes off screen",
+            "Shake out your shoulders",
+            "Short break. Hydrate now",
+            "Take a lap and reset",
+            "Loosen up before round two",
+            "Tiny break. Big payoff",
+        ]
+        let longBreakOptions = [
+            "Recharge before round two",
+            "Long break. Fully disconnect",
+            "Recovery window is open",
+            "Big reset. Let your brain idle",
+            "Step away and refill",
+            "Long pause. Come back sharp",
+            "Reset deeper this round",
+            "Extended break. Use it well",
+        ]
+
+        switch phase {
+        case .shortBreak:
+            return shortBreakOptions.randomElement() ?? "Take a short break"
+        case .longBreak:
+            return longBreakOptions.randomElement() ?? "Take a long break"
+        case .work:
+            return "Take a break"
         }
     }
 
