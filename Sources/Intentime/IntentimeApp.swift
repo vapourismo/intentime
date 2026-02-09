@@ -1207,8 +1207,29 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 private final class MessageTextField: NSTextField {
     var onEscape: (() -> Void)?
 
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureForSingleLineInput()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureForSingleLineInput()
+    }
+
     override func cancelOperation(_ sender: Any?) {
         onEscape?()
+    }
+
+    private func configureForSingleLineInput() {
+        maximumNumberOfLines = 1
+        lineBreakMode = .byClipping
+        if let cell = cell as? NSTextFieldCell {
+            cell.wraps = false
+            cell.isScrollable = true
+            cell.usesSingleLineMode = true
+            cell.lineBreakMode = .byClipping
+        }
     }
 }
 
