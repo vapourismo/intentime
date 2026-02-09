@@ -576,14 +576,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     // MARK: - Notifications
 
-    /// Flash an orange glow along the borders of all screens to signal a break starting.
+    /// Flash a glow along the borders of all screens.
     ///
-    /// The glow lasts 15 seconds total (including a 0.5 s hold) using `BorderFlashView` for the gradient.
-    private func flashScreenBorder() {
+    /// The glow uses a fixed 0.5 s hold then fades out for the remainder of `totalDuration`.
+    private func flashScreenBorder(color: NSColor, totalDuration: TimeInterval = 15.0) {
         let glowWidth: CGFloat = 40
-        let color = NSColor.systemOrange
         let holdDuration: TimeInterval = 0.5
-        let totalDuration: TimeInterval = 15.0
         let fadeDuration = max(0, totalDuration - holdDuration)
 
         for screen in NSScreen.screens {
@@ -778,7 +776,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func showPhaseBanner(for phase: TimerModel.Phase) {
         guard phase == .shortBreak || phase == .longBreak else { return }
-        flashScreenBorder()
+        flashScreenBorder(color: .systemOrange, totalDuration: 15.0)
         showBlurOverlay()
         let settings = Settings.shared
         let title = phase == .longBreak ? "Long Break" : "Short Break"
@@ -883,6 +881,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// The prompt stays visible until the user interacts with one of the buttons.
     private func showBreakEndedPrompt() {
         dismissPromptPanel()
+        flashScreenBorder(color: .systemGreen, totalDuration: 2.0)
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 88),
