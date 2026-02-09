@@ -18,7 +18,7 @@ enum IntentimeApp {
 /// Uses `NSMenuDelegate` to rebuild the menu on demand (via ``menuNeedsUpdate(_:)``)
 /// and a 0.5 s polling timer in `.common` run-loop mode to keep the menu bar title
 /// updated even while the dropdown is open.
-private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate {
     private var statusItem: NSStatusItem!
     private let timer = TimerModel()
     /// Polls `TimerModel` every 0.5 s to refresh the status item button. Runs in `.common` mode
@@ -28,6 +28,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var promptPanel: NSPanel?
     /// The Spotlight-like HUD for entering/editing the focus message.
     private var messagePanel: NSPanel?
+    /// The active message input field inside `messagePanel` (if visible).
+    private weak var messageField: NSTextField?
     /// System-wide shortcut registration (Cmd+Shift+Space).
     private var globalHotKey: GlobalHotKey?
     /// Cached break status copy so it stays stable during a single active break.
@@ -521,6 +523,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         textField.translatesAutoresizingMaskIntoConstraints = false
         textField.target = self
         textField.action = #selector(messageFieldSubmitted(_:))
+        textField.delegate = self
         textField.onEscape = { [weak self] in self?.dismissMessagePanel() }
 
         let contentView = NSView(frame: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight))
@@ -534,8 +537,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.visibleFrame
+        let targetWidth = messagePanelWidth(
+            for: textField.stringValue,
+            font: textField.font ?? NSFont.systemFont(ofSize: 18),
+            in: screenFrame)
+        panel.setContentSize(NSSize(width: targetWidth, height: panelHeight))
         let origin = NSPoint(
-            x: screenFrame.midX - panelWidth / 2,
+            x: screenFrame.midX - targetWidth / 2,
             y: screenFrame.midY + screenFrame.height * 0.15)
         panel.setFrameOrigin(origin)
 
@@ -550,6 +558,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
 
         messagePanel = panel
+        messageField = textField
+    }
+
+    /// Grow/shrink the message HUD width while typing so single-line text stays visible.
+    func controlTextDidChange(_ obj: Notification) {
+        guard
+            let field = obj.object as? NSTextField,
+            field === messageField,
+            let panel = messagePanel,
+            let screenFrame = panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+        else { return }
+
+        let targetWidth = messagePanelWidth(
+            for: field.stringValue,
+            font: field.font ?? NSFont.systemFont(ofSize: 18),
+            in: screenFrame)
+        guard abs(panel.frame.width - targetWidth) > 0.5 else { return }
+
+        let y = panel.frame.origin.y
+        let x = screenFrame.midX - targetWidth / 2
+        panel.setFrame(NSRect(x: x, y: y, width: targetWidth, height: panel.frame.height), display: true)
     }
 
     /// Called when the user presses Enter in the message text field.
@@ -564,12 +593,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private func dismissMessagePanel() {
         guard let panel = messagePanel else { return }
         messagePanel = nil
+        messageField = nil
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.15
             panel.animator().alphaValue = 0
         }, completionHandler: {
             panel.close()
         })
+    }
+
+    private func messagePanelWidth(for text: String, font: NSFont, in visibleFrame: NSRect) -> CGFloat {
+        let minWidth: CGFloat = 400
+        let maxWidth = max(minWidth, min(900, visibleFrame.width * 0.85))
+        // Match the 16pt leading/trailing constraints, with a tiny caret buffer.
+        let horizontalPadding: CGFloat = 36
+        let textWidth = ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        return min(max(minWidth, textWidth + horizontalPadding), maxWidth)
     }
 
     /// Clear the focus message and update the menu bar.
