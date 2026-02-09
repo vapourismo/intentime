@@ -407,6 +407,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         // Message section
         if timer.message != nil {
             let editItem = NSMenuItem(title: "Edit Message", action: #selector(editMessage), keyEquivalent: "")
+            editItem.keyEquivalent = " "
+            editItem.keyEquivalentModifierMask = [.command, .shift]
             editItem.target = self
             menu.addItem(editItem)
 
@@ -415,6 +417,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             menu.addItem(clearItem)
         } else {
             let setItem = NSMenuItem(title: "Set Message", action: #selector(editMessage), keyEquivalent: "")
+            setItem.keyEquivalent = " "
+            setItem.keyEquivalentModifierMask = [.command, .shift]
             setItem.target = self
             menu.addItem(setItem)
         }
