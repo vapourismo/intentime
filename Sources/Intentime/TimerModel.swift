@@ -74,7 +74,9 @@ final class TimerModel {
     /// `UserDefaults` keys for persisted timer state.
     private enum DefaultsKey {
         static let endTime = "endTime"
-        static let pausedSecondsLeft = "pausedSecondsLeft"
+        static let pausedMillisecondsLeft = "pausedMillisecondsLeft"
+        // Legacy key used before millisecond precision persistence.
+        static let pausedSecondsLeftLegacy = "pausedSecondsLeft"
         static let message = "focusMessage"
         static let phase = "pomodoroPhase"
         static let pomodorosCompleted = "pomodorosCompleted"
@@ -94,12 +96,12 @@ final class TimerModel {
 
     /// Whether a previous session is persisted and still has time remaining.
     var hasPreviousSession: Bool {
-        if UserDefaults.standard.integer(forKey: DefaultsKey.pausedSecondsLeft) > 0 {
+        if pausedMillisecondsLeft() != nil {
             return true
         }
         let endTime = UserDefaults.standard.double(forKey: DefaultsKey.endTime)
         guard endTime > 0 else { return false }
-        return Int(endTime - Date.now.timeIntervalSince1970) > 0
+        return remainingSeconds(until: endTime) != nil
     }
 
     /// Resume a previously persisted session (paused or running).
@@ -123,26 +125,37 @@ final class TimerModel {
         advancePhase(notify: false)
     }
 
-    /// Pause the running timer, persisting the remaining seconds so the session survives a restart.
+    /// Pause the running timer, persisting the remaining milliseconds so the session survives a restart.
     func pause() {
-        guard let remaining = secondsLeft, remaining > 0, !isPaused else { return }
+        guard !isPaused else { return }
+        let remainingMilliseconds = remainingMillisecondsForPause()
+        guard remainingMilliseconds > 0 else { return }
+
         timer?.invalidate()
         timer = nil
         UserDefaults.standard.removeObject(forKey: DefaultsKey.endTime)
-        UserDefaults.standard.set(remaining, forKey: DefaultsKey.pausedSecondsLeft)
+        UserDefaults.standard.set(remainingMilliseconds, forKey: DefaultsKey.pausedMillisecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeftLegacy)
         flushDefaults()
+
+        secondsLeft = remainingSeconds(fromMilliseconds: remainingMilliseconds)
         isPaused = true
         updateDerived()
     }
 
-    /// Resume from a paused state, recomputing a new end-time from the saved remaining seconds.
+    /// Resume from a paused state, recomputing a new end-time from the saved remaining milliseconds.
     func unpause() {
-        guard isPaused, let remaining = secondsLeft, remaining > 0 else { return }
+        guard isPaused, let remainingMilliseconds = pausedMillisecondsLeft() else { return }
+
         isPaused = false
-        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
-        let endTime = Date.now.timeIntervalSince1970 + Double(remaining)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedMillisecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeftLegacy)
+
+        let endTime = Date.now.timeIntervalSince1970 + (Double(remainingMilliseconds) / 1000.0)
         UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
         flushDefaults()
+
+        secondsLeft = remainingSeconds(fromMilliseconds: remainingMilliseconds)
         updateDerived()
         startTimer()
     }
@@ -150,7 +163,8 @@ final class TimerModel {
     /// Stop the timer entirely, clearing all persisted state and resetting to idle.
     func stop() {
         UserDefaults.standard.removeObject(forKey: DefaultsKey.endTime)
-        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedMillisecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeftLegacy)
         UserDefaults.standard.removeObject(forKey: DefaultsKey.phase)
         UserDefaults.standard.removeObject(forKey: DefaultsKey.pomodorosCompleted)
         flushDefaults()
@@ -170,7 +184,8 @@ final class TimerModel {
     private func startPhase() {
         let endTime = Date.now.timeIntervalSince1970 + phaseDuration
         UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
-        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedMillisecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeftLegacy)
         flushDefaults()
         tick()
         startTimer()
@@ -194,7 +209,8 @@ final class TimerModel {
         let duration = TimeInterval(settings.extendBreakMinutes * 60)
         let endTime = Date.now.timeIntervalSince1970 + duration
         UserDefaults.standard.set(endTime, forKey: DefaultsKey.endTime)
-        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedMillisecondsLeft)
+        UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeftLegacy)
         flushDefaults()
         tick()
         startTimer()
@@ -270,9 +286,13 @@ final class TimerModel {
 
     /// Restore timer state from `UserDefaults` — either a paused session or a running countdown.
     private func restoreTimer() {
-        let pausedSeconds = UserDefaults.standard.integer(forKey: DefaultsKey.pausedSecondsLeft)
-        if pausedSeconds > 0 {
-            secondsLeft = pausedSeconds
+        if let pausedMilliseconds = pausedMillisecondsLeft() {
+            // Migrate any legacy seconds value to millisecond persistence.
+            UserDefaults.standard.set(pausedMilliseconds, forKey: DefaultsKey.pausedMillisecondsLeft)
+            UserDefaults.standard.removeObject(forKey: DefaultsKey.pausedSecondsLeftLegacy)
+            flushDefaults()
+
+            secondsLeft = remainingSeconds(fromMilliseconds: pausedMilliseconds)
             isPaused = true
             updateDerived()
             return
@@ -281,8 +301,7 @@ final class TimerModel {
         let endTime = UserDefaults.standard.double(forKey: DefaultsKey.endTime)
         guard endTime > 0 else { return }
 
-        let remaining = Int(endTime - Date.now.timeIntervalSince1970)
-        if remaining > 0 {
+        if let remaining = remainingSeconds(until: endTime) {
             secondsLeft = remaining
             updateDerived()
             startTimer()
@@ -307,12 +326,61 @@ final class TimerModel {
             stop()
             return
         }
-        let remaining = Int(endTime - Date.now.timeIntervalSince1970)
-        if remaining > 0 {
+        if let remaining = remainingSeconds(until: endTime) {
             secondsLeft = remaining
             updateDerived()
         } else {
             advancePhase()
         }
+    }
+
+    /// Convert an absolute end-time to whole seconds remaining.
+    ///
+    /// Uses ceiling to avoid skipping visible values when timer callbacks drift slightly
+    /// past exact 1-second boundaries (for example right after unpausing).
+    private func remainingSeconds(until endTime: TimeInterval) -> Int? {
+        let delta = endTime - Date.now.timeIntervalSince1970
+        let seconds = Int(ceil(delta))
+        return seconds > 0 ? seconds : nil
+    }
+
+    /// Convert an absolute end-time to whole milliseconds remaining.
+    private func remainingMilliseconds(until endTime: TimeInterval) -> Int? {
+        let delta = endTime - Date.now.timeIntervalSince1970
+        let milliseconds = Int(ceil(delta * 1000.0))
+        return milliseconds > 0 ? milliseconds : nil
+    }
+
+    /// Convert whole milliseconds remaining to display seconds.
+    private func remainingSeconds(fromMilliseconds milliseconds: Int) -> Int? {
+        guard milliseconds > 0 else { return nil }
+        return Int(ceil(Double(milliseconds) / 1000.0))
+    }
+
+    /// Read paused milliseconds from defaults (supports legacy seconds key).
+    private func pausedMillisecondsLeft() -> Int? {
+        let milliseconds = UserDefaults.standard.integer(forKey: DefaultsKey.pausedMillisecondsLeft)
+        if milliseconds > 0 {
+            return milliseconds
+        }
+
+        let legacySeconds = UserDefaults.standard.integer(forKey: DefaultsKey.pausedSecondsLeftLegacy)
+        if legacySeconds > 0 {
+            return legacySeconds * 1000
+        }
+
+        return nil
+    }
+
+    /// Compute remaining milliseconds to persist when pausing.
+    private func remainingMillisecondsForPause() -> Int {
+        let endTime = UserDefaults.standard.double(forKey: DefaultsKey.endTime)
+        if let milliseconds = remainingMilliseconds(until: endTime) {
+            return milliseconds
+        }
+        if let secondsLeft, secondsLeft > 0 {
+            return secondsLeft * 1000
+        }
+        return 0
     }
 }
