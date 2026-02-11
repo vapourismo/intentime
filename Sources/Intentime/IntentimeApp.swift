@@ -37,8 +37,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var breakStatusText: String?
     /// Cached app logo image used as the default/idle status-item icon.
     private lazy var appLogoStatusImage: NSImage? = loadAppLogoStatusImage()
+    /// Token for observing screen-lock events from `loginwindow`.
+    private var screenLockObserver: NSObjectProtocol?
 
     func applicationWillTerminate(_ notification: Notification) {
+        if let observer = screenLockObserver {
+            DistributedNotificationCenter.default().removeObserver(observer)
+            screenLockObserver = nil
+        }
         // Ensure timer state is flushed to disk before exit.
         UserDefaults.standard.synchronize()
     }
@@ -74,6 +80,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         ) { [weak self] in
             self?.showMessageInput()
         }
+
+        registerScreenLockObserver()
     }
 
     /// Refresh the status item's icon and title to reflect the current timer/message state.
@@ -460,6 +468,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// Resume a paused timer.
     @objc private func unpauseTimer() {
         timer.unpause()
+        if timer.isRunning && (timer.phase == .shortBreak || timer.phase == .longBreak) {
+            showBlurOverlay()
+        }
         updateButton()
     }
 
@@ -487,6 +498,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     /// Open the message input HUD (same panel used by the global hotkey).
     @objc private func editMessage() {
         showMessageInput()
+    }
+
+    /// Pause an active countdown when macOS locks the user session.
+    private func registerScreenLockObserver() {
+        screenLockObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.screenIsLocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleScreenLocked()
+        }
+    }
+
+    /// Handles `com.apple.screenIsLocked` by pausing the timer and hiding break blur.
+    private func handleScreenLocked() {
+        guard timer.isRunning else { return }
+        timer.pause()
+        if timer.phase == .shortBreak || timer.phase == .longBreak {
+            dismissBlurOverlay()
+        }
+        updateButton()
     }
 
     // MARK: - Message input panel
